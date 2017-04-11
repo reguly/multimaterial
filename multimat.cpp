@@ -68,8 +68,8 @@ int main(int argc, char* argv[]) {
 	//Initialise arrays
 	double dx = 1.0/sizex;
 	double dy = 1.0/sizey;
-	for (int j = 0; j < sizey; j ++) {
-		for (int i = 0; i < sizex; i ++) {
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
 			V[i+j*sizex] = dx*dy;
 			x[i+j*sizex] = dx*i;
 			y[i+j*sizex] = dy*j;
@@ -185,32 +185,43 @@ int main(int argc, char* argv[]) {
 		rho[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat] = 0.0;t[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;p[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;
 	}
 
+	FILE *f;
 	int print_to_file = 0;
-	if (print_to_file==1) {
+
+	if (print_to_file==1)
 		FILE *f = fopen("map.txt","w");
 
-		//Compute fractions and count cells
-		int cell_counts_by_mat[4] = {0,0,0,0};
-		for (int j = 0; j < sizey; j ++) {
-			for (int i = 0; i < sizex; i ++) {
-				int count = 0;
-				for (int mat = 0; mat < Nmats; mat++) {
-					count += rho[(i+sizex*j)*Nmats+mat]!=0.0;
-				}
-				if (count == 0) printf("Error: no materials in cell %d %d\n",i,j);
-				cell_counts_by_mat[count-1]++;
+	//Compute fractions and count cells
+	int cell_counts_by_mat[4] = {0,0,0,0};
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			int count = 0;
+			for (int mat = 0; mat < Nmats; mat++) {
+				count += rho[(i+sizex*j)*Nmats+mat]!=0.0;
+			}
+			if (count == 0) {
+				printf("Error: no materials in cell %d %d\n",i,j);
+				exit(1);
+			}
+			cell_counts_by_mat[count-1]++;
+
+			if (print_to_file) {
 				if (i!=0) fprintf(f,", %d",count);
 				else fprintf(f,"%d",count);
-				for (int mat = 0; mat < Nmats; mat++) {
-					if (rho[(i+sizex*j)*Nmats+mat]!=0.0) Vf[(i+sizex*j)*Nmats+mat]=1.0/count;
-				}
 			}
-			fprintf(f,"\n");
+
+			for (int mat = 0; mat < Nmats; mat++) {
+				if (rho[(i+sizex*j)*Nmats+mat]!=0.0) Vf[(i+sizex*j)*Nmats+mat]=1.0/count;
+			}
 		}
-		fclose(f);
-		printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d\n",
-			cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3]);
+		if (print_to_file)
+			fprintf(f,"\n");
 	}
+	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d\n",
+		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3]);
+
+	if (print_to_file)
+		fclose(f);
 
 	//Algorithm 1 - average density in cell
 	for (int j = 0; j < sizey; j++) {
@@ -227,4 +238,9 @@ int main(int argc, char* argv[]) {
 
 	//Algorithm 3
 
+
+	free(rho); free(p); free(Vf); free(t);
+	free(V); free(x); free(y);
+	free(rho_ave);
+	return 0;
 }
