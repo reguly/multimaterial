@@ -317,6 +317,91 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	// Material-centric algorithms
+	// TODO: do actual storage modification
+
+	// Computational loop 1 - average density in cell
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			rho_ave[i+sizex*j] = 0.0;
+		}
+	}
+
+	for (int mat = 0; mat < Nmats; mat++) {
+		for (int j = 0; j < sizey; j++) {
+			for (int i = 0; i < sizex; i++) {
+				rho_ave[i+sizex*j] = rho[ncells*mat + i+sizex*j] * Vf[ncells*mat + i+sizex*j];
+			}
+		}
+	}
+
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			rho_ave[i+sizex*j] /= V[i+sizex*j];
+		}
+	}
+
+	// Computational loop 2 - Pressure for each cell and each material
+	for (int mat = 0; mat < Nmats; mat++) {
+		double nm = n[mat];
+
+		for (int j = 0; j < sizey; j++) {
+			for (int i = 0; i < sizex; i++) {
+				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
+					p[ncells*mat + i+sizex*j] = (nm * rho[ncells*mat + i+sizex*j] * t[ncells*mat + i+sizex*j]) / Vf[ncells*mat + i+sizex*j];
+				}
+				else {
+					p[ncells*mat + i+sizex*j] = 0.0;
+				}
+			}
+		}
+	}
+
+	// Computational loop 3 - Average density of each material over neighborhood of each cell
+	for (int mat = 0; mat < Nmats; mat++) {
+		for (int j = 0; j < sizey; j++) {
+			for (int i = 0; i < sizex; i++) {
+				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
+					// o: outer
+					double xo = x[i+sizex*j];
+					double yo = y[i+sizex*j];
+
+					double rho_sum = 0.0;
+					int Nn = 0;
+
+					for (int nj = -1; nj <= 1; nj++) {
+						if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
+							continue;
+
+						for (int ni = -1; nj <= 1; nj++) {
+							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
+								continue;
+
+							if (Vf[ncells*mat + (i+ni)+sizex*(j+nj)] > 0.0) {
+								double dsqr = 0.0;
+
+								// i: inner
+								double xi = x[(i+ni)+sizex*(j+nj)];
+								double yi = y[(i+ni)+sizex*(j+nj)];
+
+								dsqr += (xo - xi) * (xo - xi);
+								dsqr += (yo - yi) * (yo - yi);
+
+								rho_sum += rho[ncells*mat + i+sizex*j] / dsqr;
+								Nn += 1;
+							}
+						}
+					}
+
+					rho[ncells*mat + i+sizex*j] = rho_sum / Nn;
+				}
+				else {
+					rho[ncells*mat + i+sizex*j] = 0.0;
+				}
+			}
+		}
+	}
+
 	free(rho); free(p); free(Vf); free(t);
 	free(V); free(x); free(y);
 	free(n);
