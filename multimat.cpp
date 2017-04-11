@@ -260,7 +260,62 @@ int main(int argc, char* argv[]) {
 
 
 	//Algorithm 3
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			// o: outer
+			double xo = x[i+sizex*j];
+			double yo = y[i+sizex*j];
 
+			// There are at most 9 neighbours in 2D case.
+			// TODO: is this still local to CPU (i.e. no need for memory transfer)?
+			double dsqr[9];
+
+			for (int nj = -1; nj <= 1; nj++) {
+				if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
+					continue;
+
+				for (int ni = -1; nj <= 1; nj++) {
+					if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
+						continue;
+
+					dsqr[(nj+1)*3 + (ni+1)] = 0.0;
+
+					// i: inner
+					double xi = x[(i+ni)+sizex*(j+nj)];
+					double yi = y[(i+ni)+sizex*(j+nj)];
+
+					dsqr[(nj+1)*3 + (ni+1)] += (xo - xi) * (xo - xi);
+					dsqr[(nj+1)*3 + (ni+1)] += (yo - yi) * (yo - yi);
+				}
+			}
+
+			for (int mat = 0; mat < Nmats; mat++) {
+				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
+					double rho_sum = 0.0;
+					int Nn = 0;
+
+					for (int nj = -1; nj <= 1; nj++) {
+						if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
+							continue;
+
+						for (int ni = -1; nj <= 1; nj++) {
+							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
+								continue;
+
+							if (Vf[((i+ni)+sizex*(j+nj))*Nmats+mat] > 0.0) {
+								rho_sum += rho[((i+ni)+sizex*(j+nj))*Nmats+mat] / dsqr[(nj+1)*3 + (ni+1)];
+								Nn += 1;
+							}
+						}
+					}
+					rho[(i+sizex*j)*Nmats+mat] = rho_sum / Nn;
+				}
+				else {
+					rho[(i+sizex*j)*Nmats+mat] = 0.0;
+				}
+			}
+		}
+	}
 
 	free(rho); free(p); free(Vf); free(t);
 	free(V); free(x); free(y);
