@@ -31,6 +31,7 @@
   * @author Istvan Reguly
   */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstring>
@@ -57,6 +58,16 @@ int main(int argc, char* argv[]) {
 	double *t = (double*)malloc(Nmats*ncells*sizeof(double));
 	memset(t, 0, Nmats*ncells*sizeof(double));
 
+	// Buffers for material-centric representation
+	//density
+	double *rho_mat =  (double*)malloc(Nmats*ncells*sizeof(double));
+	//pressure
+	double *p_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+	//Fractional volume
+	double *Vf_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+	//temperature
+	double *t_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+
 	//Allocate per-cell only datasets
 	double *V = (double*)malloc(ncells*sizeof(double));
 	double *x = (double*)malloc(ncells*sizeof(double));
@@ -67,6 +78,7 @@ int main(int argc, char* argv[]) {
 
 	//Allocate output datasets
 	double *rho_ave = (double*)malloc(ncells*sizeof(double));
+	double *rho_ave_mat = (double*)malloc(ncells*sizeof(double));
 
 	//Initialise arrays
 	double dx = 1.0/sizex;
@@ -208,7 +220,10 @@ int main(int argc, char* argv[]) {
 			}
 			if (count == 0) {
 				printf("Error: no materials in cell %d %d\n",i,j);
-				exit(1);
+				if (print_to_file)
+					fclose(f);
+
+				goto end;
 			}
 			cell_counts_by_mat[count-1]++;
 
@@ -229,6 +244,44 @@ int main(int argc, char* argv[]) {
 
 	if (print_to_file)
 		fclose(f);
+
+	// Convert representation to material-centric (using extra buffers)
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			for (int mat = 0; mat < Nmats; mat++) {
+				rho_mat[ncells*mat + i+sizex*j] = rho[(i+sizex*j)*Nmats+mat];
+				p_mat[ncells*mat + i+sizex*j] = p[(i+sizex*j)*Nmats+mat];
+				Vf_mat[ncells*mat + i+sizex*j] = Vf[(i+sizex*j)*Nmats+mat];
+				t_mat[ncells*mat + i+sizex*j] = t[(i+sizex*j)*Nmats+mat];
+			}
+		}
+	}
+
+	// Check new storage scheme
+	//Compute fractions and count cells
+	for (int i = 0; i < 4; i++) {
+		cell_counts_by_mat[i] = 0;
+	}
+
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			int count = 0;
+			for (int mat = 0; mat < Nmats; mat++) {
+				count += rho_mat[ncells*mat + i+sizex*j]!=0.0;
+			}
+			if (count == 0) {
+				printf("Error: no materials in cell %d %d\n",i,j);
+				goto end;
+			}
+			cell_counts_by_mat[count-1]++;
+
+			for (int mat = 0; mat < Nmats; mat++) {
+				if (rho_mat[ncells*mat + i+sizex*j]!=0.0) Vf_mat[ncells*mat + i+sizex*j]=1.0/count;
+			}
+		}
+	}
+	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d\n",
+		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3]);
 
 	// Cell-centric algorithms
 	// Computational loop 1 - average density in cell
@@ -318,28 +371,37 @@ int main(int argc, char* argv[]) {
 	}
 
 	// Material-centric algorithms
-	// TODO: do actual storage modification
-
 	// Computational loop 1 - average density in cell
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
-			rho_ave[i+sizex*j] = 0.0;
+			rho_ave_mat[i+sizex*j] = 0.0;
 		}
 	}
 
 	for (int mat = 0; mat < Nmats; mat++) {
 		for (int j = 0; j < sizey; j++) {
 			for (int i = 0; i < sizex; i++) {
-				rho_ave[i+sizex*j] = rho[ncells*mat + i+sizex*j] * Vf[ncells*mat + i+sizex*j];
+				rho_ave_mat[i+sizex*j] += rho_mat[ncells*mat + i+sizex*j] * Vf_mat[ncells*mat + i+sizex*j];
 			}
 		}
 	}
 
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
-			rho_ave[i+sizex*j] /= V[i+sizex*j];
+			rho_ave_mat[i+sizex*j] /= V[i+sizex*j];
 		}
 	}
+
+	// Check result
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			if (abs(rho_ave[i+sizex*j] - rho_ave_mat[i+sizex*j]) > 0.0001) {
+				printf("1. cell-centric and material-centric values are not equal! (%f, %f, %d, %d)\n",
+					rho_ave[i+sizex*j], rho_ave_mat[i+sizex*j], i, j);
+				goto end;
+			}
+		}
+	}	
 
 	// Computational loop 2 - Pressure for each cell and each material
 	for (int mat = 0; mat < Nmats; mat++) {
@@ -347,11 +409,24 @@ int main(int argc, char* argv[]) {
 
 		for (int j = 0; j < sizey; j++) {
 			for (int i = 0; i < sizex; i++) {
-				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
-					p[ncells*mat + i+sizex*j] = (nm * rho[ncells*mat + i+sizex*j] * t[ncells*mat + i+sizex*j]) / Vf[ncells*mat + i+sizex*j];
+				if (Vf_mat[ncells*mat + i+sizex*j] > 0.0) {
+					p_mat[ncells*mat + i+sizex*j] = (nm * rho_mat[ncells*mat + i+sizex*j] * t_mat[ncells*mat + i+sizex*j]) / Vf_mat[ncells*mat + i+sizex*j];
 				}
 				else {
-					p[ncells*mat + i+sizex*j] = 0.0;
+					p_mat[ncells*mat + i+sizex*j] = 0.0;
+				}
+			}
+		}
+	}
+
+	// Check result
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			for (int mat = 0; mat < Nmats; mat++) {
+				if (abs(p[(i+sizex*j)*Nmats+mat] - p_mat[ncells*mat + i+sizex*j]) > 0.0001) {
+					printf("2. cell-centric and material-centric values are not equal! (%f, %f, %d, %d)\n",
+						p[(i+sizex*j)*Nmats+mat], p_mat[ncells*mat + i+sizex*j], i, j);
+					goto end;
 				}
 			}
 		}
@@ -361,7 +436,7 @@ int main(int argc, char* argv[]) {
 	for (int mat = 0; mat < Nmats; mat++) {
 		for (int j = 0; j < sizey; j++) {
 			for (int i = 0; i < sizex; i++) {
-				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
+				if (Vf_mat[ncells*mat + i+sizex*j] > 0.0) {
 					// o: outer
 					double xo = x[i+sizex*j];
 					double yo = y[i+sizex*j];
@@ -377,7 +452,7 @@ int main(int argc, char* argv[]) {
 							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
 								continue;
 
-							if (Vf[ncells*mat + (i+ni)+sizex*(j+nj)] > 0.0) {
+							if (Vf_mat[ncells*mat + (i+ni)+sizex*(j+nj)] > 0.0) {
 								double dsqr = 0.0;
 
 								// i: inner
@@ -387,24 +462,41 @@ int main(int argc, char* argv[]) {
 								dsqr += (xo - xi) * (xo - xi);
 								dsqr += (yo - yi) * (yo - yi);
 
-								rho_sum += rho[ncells*mat + i+sizex*j] / dsqr;
+								rho_sum += rho_mat[ncells*mat + i+sizex*j] / dsqr;
 								Nn += 1;
 							}
 						}
 					}
 
-					rho[ncells*mat + i+sizex*j] = rho_sum / Nn;
+					rho_mat[ncells*mat + i+sizex*j] = rho_sum / Nn;
 				}
 				else {
-					rho[ncells*mat + i+sizex*j] = 0.0;
+					rho_mat[ncells*mat + i+sizex*j] = 0.0;
 				}
 			}
 		}
 	}
 
+	// Check result
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			for (int mat = 0; mat < Nmats; mat++) {
+				if (abs(rho[(i+sizex*j)*Nmats+mat] - rho_mat[ncells*mat + i+sizex*j]) > 0.0001) {
+					printf("3. cell-centric and material-centric values are not equal! (%f, %f, %d, %d)\n",
+						rho[(i+sizex*j)*Nmats+mat], rho_mat[ncells*mat + i+sizex*j], i, j);
+					goto end;
+				}
+			}
+		}
+	}
+
+	printf("All tests passed!\n");
+
+end:
+	free(rho_mat); free(p_mat); free(Vf_mat); free(t_mat);
 	free(rho); free(p); free(Vf); free(t);
 	free(V); free(x); free(y);
 	free(n);
-	free(rho_ave);
+	free(rho_ave); free(rho_ave_mat);
 	return 0;
 }
