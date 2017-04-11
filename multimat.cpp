@@ -230,7 +230,8 @@ int main(int argc, char* argv[]) {
 	if (print_to_file)
 		fclose(f);
 
-	//Algorithm 1 - average density in cell
+	// Cell-centric algorithms
+	// Computational loop 1 - average density in cell
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++){
 			double ave = 0.0;
@@ -243,7 +244,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	//Algorithm 2
+	// Computational loop 2 - Pressure for each cell and each material
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			for (int mat = 0; mat < Nmats; mat++) {
@@ -258,8 +259,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-
-	//Algorithm 3
+	// Computational loop 3 - Average density of each material over neighborhood of each cell
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			// o: outer
