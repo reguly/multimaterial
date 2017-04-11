@@ -62,6 +62,9 @@ int main(int argc, char* argv[]) {
 	double *x = (double*)malloc(ncells*sizeof(double));
 	double *y = (double*)malloc(ncells*sizeof(double));
 
+	//Allocate per-material only datasets
+	double *n = (double*)malloc(Nmats*sizeof(double)); // number of moles
+
 	//Allocate output datasets
 	double *rho_ave = (double*)malloc(ncells*sizeof(double));
 
@@ -74,6 +77,10 @@ int main(int argc, char* argv[]) {
 			x[i+j*sizex] = dx*i;
 			y[i+j*sizex] = dy*j;
 		}
+	}
+
+	for (int mat = 0; mat < Nmats; mat++) {
+		n[mat] = 1.0; // dummy value
 	}
 
 	//Pure cells and simple overlaps
@@ -228,6 +235,8 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < sizex; i++){
 			double ave = 0.0;
 			for (int mat = 0; mat < Nmats; mat++) {
+				// Optimisation:
+				// if (Vf[(i+sizex*j)*Nmats+mat] > 0.0)
 				ave += rho[(i+sizex*j)*Nmats+mat]*Vf[(i+sizex*j)*Nmats+mat];
 			}
 			rho_ave[i+sizex*j] = ave/V[i+sizex*j];
@@ -235,12 +244,27 @@ int main(int argc, char* argv[]) {
 	}
 
 	//Algorithm 2
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			for (int mat = 0; mat < Nmats; mat++) {
+				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
+					double nm = n[mat];
+					p[(i+sizex*j)*Nmats+mat] = (nm * rho[(i+sizex*j)*Nmats+mat] * t[(i+sizex*j)*Nmats+mat]) / Vf[(i+sizex*j)*Nmats+mat];
+				}
+				else {
+					p[(i+sizex*j)*Nmats+mat] = 0.0;
+				}
+			}
+		}
+	}
+
 
 	//Algorithm 3
 
 
 	free(rho); free(p); free(Vf); free(t);
 	free(V); free(x); free(y);
+	free(n);
 	free(rho_ave);
 	return 0;
 }
