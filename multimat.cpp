@@ -266,6 +266,29 @@ int main(int argc, char* argv[]) {
 	double *rho_ave = (double*)malloc(ncells*sizeof(double));
 	double *rho_ave_mat = (double*)malloc(ncells*sizeof(double));
 
+	// Cell-centric mixed material storage
+	double *rho_mixed = (double*)malloc(ncells*sizeof(double));
+	double *p_mixed = (double*)malloc(ncells*sizeof(double));
+	double *t_mixed = (double*)malloc(ncells*sizeof(double));
+
+	int *nmats = (int*)malloc(ncells*sizeof(int));
+	int *imaterial = (int*)malloc(ncells*sizeof(int));
+
+	// List
+	int list_size = 49000 * 2 + 600 * 3 + 400 * 4;
+
+	int *nextfrac = (int*)malloc(list_size*sizeof(int));
+	int *frac2cell = (int*)malloc(list_size*sizeof(int));
+	int *matids = (int*)malloc(list_size*sizeof(int));
+
+	double *Vf_mixed_list = (double*)malloc(list_size*sizeof(double));
+	double *rho_mixed_list = (double*)malloc(list_size*sizeof(double));
+	double *t_mixed_list = (double*)malloc(list_size*sizeof(double));
+	double *p_mixed_list = (double*)malloc(list_size*sizeof(double));
+
+	int imaterial_pure_cell;
+	int imaterial_multi_cell;
+
 	//Initialise arrays
 	double dx = 1.0/sizex;
 	double dy = 1.0/sizey;
@@ -443,41 +466,15 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	// Check new storage scheme
-	//Compute fractions and count cells
-	for (int i = 0; i < 4; i++) {
-		cell_counts_by_mat[i] = 0;
-	}
-
-	for (int j = 0; j < sizey; j++) {
-		for (int i = 0; i < sizex; i++) {
-			int count = 0;
-			for (int mat = 0; mat < Nmats; mat++) {
-				count += rho_mat[ncells*mat + i+sizex*j]!=0.0;
-			}
-			if (count == 0) {
-				printf("Error: no materials in cell %d %d\n",i,j);
-				goto end;
-			}
-			cell_counts_by_mat[count-1]++;
-
-			for (int mat = 0; mat < Nmats; mat++) {
-				if (rho_mat[ncells*mat + i+sizex*j]!=0.0) Vf_mat[ncells*mat + i+sizex*j]=1.0/count;
-			}
-		}
-	}
-	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d\n",
-		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3]);
-
 	cell_centric_calculations(sizex, sizey, Nmats, rho, p, Vf, t, V, x, y, n, rho_ave);
 	material_centric_calculations(sizex, sizey, Nmats, rho_mat, p_mat, Vf_mat, t_mat, V, x, y, n, rho_ave_mat);
 
 	// Check results
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
-			if (abs(rho_ave[i+sizex*j] - rho_ave[i+sizex*j]) > 0.0001) {
+			if (abs(rho_ave[i+sizex*j] - rho_ave_mat[i+sizex*j]) > 0.0001) {
 				printf("1. cell-centric and material-centric values are not equal! (%f, %f, %d, %d)\n",
-					rho_ave[i+sizex*j], rho_ave[i+sizex*j], i, j);
+					rho_ave[i+sizex*j], rho_ave_mat[i+sizex*j], i, j);
 				goto end;
 			}
 
@@ -499,11 +496,104 @@ int main(int argc, char* argv[]) {
 
 	printf("All tests passed!\n");
 
+	// Copy data from cell-centric full matrix storage to cell-centric mixed material storage
+	imaterial_pure_cell = 1; // TODO: why is this needed?
+	imaterial_multi_cell = 0;
+
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			int mat_indices[4] = { -1, -1, -1, -1 };
+			int matindex = 0;
+			int count = 0;
+
+			for (int mat = 0; mat < Nmats; mat++) {
+				if (rho[(i+sizex*j)*Nmats+mat]!=0.0) {
+					mat_indices[matindex++] = mat;
+					count += 1;
+				}
+			}
+
+			if (count == 0) {
+				printf("Error: no materials in cell %d %d\n",i,j);
+				goto end;
+			}
+
+			if (count == 1) {
+				int mat = mat_indices[0];
+				rho_mixed[i+sizex*j] = rho[(i+sizex*j)*Nmats+mat];
+				p_mixed[i+sizex*j] = p[(i+sizex*j)*Nmats+mat];
+				t_mixed[i+sizex*j] = t[(i+sizex*j)*Nmats+mat];
+				nmats[i+sizex*j] = -1;
+				imaterial[i+sizex*j] = imaterial_pure_cell++;
+			}
+			else { // count > 1
+				nmats[i+sizex*j] = count;
+				// note the minus sign, it needs to be negative
+				imaterial[i+sizex*j] = -imaterial_multi_cell;
+
+				for (int list_idx = imaterial_multi_cell; list_idx < imaterial_multi_cell + count; ++list_idx) {
+					// if last iteration
+					if (list_idx == imaterial_multi_cell + count - 1)
+						nextfrac[list_idx] = -1;
+					else // not last
+						nextfrac[list_idx] = list_idx + 1;
+
+					frac2cell[list_idx] = i+sizex*j;
+
+					int mat = mat_indices[list_idx - imaterial_multi_cell];
+					matids[list_idx] = mat;
+
+					Vf_mixed_list[list_idx] = Vf[(i+sizex*j)*Nmats+mat];
+					rho_mixed_list[list_idx] = rho[(i+sizex*j)*Nmats+mat];
+					p_mixed_list[list_idx] = p[(i+sizex*j)*Nmats+mat];
+					t_mixed_list[list_idx] = t[(i+sizex*j)*Nmats+mat];
+				}
+
+				imaterial_multi_cell += count;
+			}
+		}
+	}
+
+	// Cell-centric algorithms
+	// Computational loop 1 - average density in cell
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			double ave = 0.0;
+			int ix = imaterial[i+sizex*j];
+
+			if (ix <= 0) {
+				// condition is 'ix >= 0', this is the equivalent of
+				// 'until ix < 0' from the paper
+				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
+					ave += rho_mixed_list[ix] * Vf_mixed_list[ix];
+				}
+				rho_mixed[i+sizex*j] = ave/V[i+sizex*j];
+			}
+		}
+	}
+
+	// Check results
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			if (abs(rho_ave[i+sizex*j] - rho_mixed[i+sizex*j]) > 0.0001) {
+				printf("1. cell-centric and mixed material cell-centric values are not equal! (%f, %f, %d, %d)\n",
+					rho_ave[i+sizex*j], rho_mixed[i+sizex*j], i, j);
+				goto end;
+			}
+		}
+	}
+
 end:
 	free(rho_mat); free(p_mat); free(Vf_mat); free(t_mat);
 	free(rho); free(p); free(Vf); free(t);
 	free(V); free(x); free(y);
 	free(n);
 	free(rho_ave); free(rho_ave_mat);
+
+	free(rho_mixed); free(p_mixed); free(t_mixed);
+	free(nmats); free(imaterial);
+	free(nextfrac); free(frac2cell); free(matids);
+	free(Vf_mixed_list); free(rho_mixed_list);
+	free(t_mixed_list); free(p_mixed_list);
 	return 0;
 }
