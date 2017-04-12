@@ -483,14 +483,14 @@ int main(int argc, char* argv[]) {
 
 			for (int mat = 0; mat < Nmats; mat++) {
 				if (abs(p[(i+sizex*j)*Nmats+mat] - p_mat[ncells*mat + i+sizex*j]) > 0.0001) {
-					printf("2. cell-centric and material-centric values are not equal! (%f, %f, %d, %d)\n",
-						p[(i+sizex*j)*Nmats+mat], p_mat[ncells*mat + i+sizex*j], i, j);
+					printf("2. cell-centric and material-centric values are not equal! (%f, %f, %d, %d, %d)\n",
+						p[(i+sizex*j)*Nmats+mat], p_mat[ncells*mat + i+sizex*j], i, j, mat);
 					goto end;
 				}
 
 				if (abs(rho[(i+sizex*j)*Nmats+mat] - rho_mat[ncells*mat + i+sizex*j]) > 0.0001) {
-					printf("3. cell-centric and material-centric values are not equal! (%f, %f, %d, %d)\n",
-						rho[(i+sizex*j)*Nmats+mat], rho_mat[ncells*mat + i+sizex*j], i, j);
+					printf("3. cell-centric and material-centric values are not equal! (%f, %f, %d, %d, %d)\n",
+						rho[(i+sizex*j)*Nmats+mat], rho_mat[ncells*mat + i+sizex*j], i, j, mat);
 					goto end;
 				}
 			}
