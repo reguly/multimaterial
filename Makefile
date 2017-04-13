@@ -10,5 +10,5 @@ clean:
 	rm -f *.o
 	rm -f multimat
 
-multimat: multimat.o
+multimat: compact.o full_matrix.o multimat.o
 	$(CC) $(CFLAGS) -o $@ $^ -lm
