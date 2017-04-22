@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-Ofast -mavx2 -ftree-vectorizer-verbose=1 -fopt-info-vec
 
-.c.o:
+.cpp.o:
 	$(CC) -c $(CFLAGS) $<
 
 all: multimat

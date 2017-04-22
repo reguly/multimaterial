@@ -43,14 +43,13 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 			double yo = y[i+sizex*j];
 
 			// There are at most 9 neighbours in 2D case.
-			// TODO: is this still local to CPU (i.e. no need for memory transfer)?
 			double dsqr[9];
 
 			for (int nj = -1; nj <= 1; nj++) {
 				if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
 					continue;
 
-				for (int ni = -1; nj <= 1; nj++) {
+				for (int ni = -1; ni <= 1; ni++) {
 					if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
 						continue;
 
@@ -74,7 +73,7 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 						if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
 							continue;
 
-						for (int ni = -1; nj <= 1; nj++) {
+						for (int ni = -1; ni <= 1; ni++) {
 							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
 								continue;
 
@@ -157,7 +156,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 						if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
 							continue;
 
-						for (int ni = -1; nj <= 1; nj++) {
+						for (int ni = -1; ni <= 1; ni++) {
 							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
 								continue;
 
