@@ -36,61 +36,91 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 	}
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
-	for (int j = 0; j < sizey; j++) {
-		for (int i = 0; i < sizex; i++) {
-			// o: outer
-			double xo = x[i+sizex*j];
-			double yo = y[i+sizex*j];
+#define LOOP_BODY(nj_min, nj_max, ni_min, ni_max) \
+	do { \
+		/* o: outer */ \
+		double xo = x[i+sizex*j]; \
+		double yo = y[i+sizex*j]; \
+		\
+		/* There are at most 9 neighbours in 2D case. */ \
+		double dsqr[9]; \
+		\
+		for (int nj = nj_min; nj <= nj_max; nj++) { \
+			for (int ni = ni_min; ni <= ni_max; ni++) { \
+				dsqr[(nj+1)*3 + (ni+1)] = 0.0; \
+				\
+				/* i: inner */ \
+				double xi = x[(i+ni)+sizex*(j+nj)]; \
+				double yi = y[(i+ni)+sizex*(j+nj)]; \
+				\
+				dsqr[(nj+1)*3 + (ni+1)] += (xo - xi) * (xo - xi); \
+				dsqr[(nj+1)*3 + (ni+1)] += (yo - yi) * (yo - yi); \
+			} \
+		} \
+		\
+		for (int mat = 0; mat < Nmats; mat++) { \
+			if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) { \
+				double rho_sum = 0.0; \
+				int Nn = 0; \
+				\
+				for (int nj = nj_min; nj <= nj_max; nj++) { \
+					for (int ni = ni_min; ni <= ni_max; ni++) { \
+						if (Vf[((i+ni)+sizex*(j+nj))*Nmats+mat] > 0.0) { \
+							rho_sum += rho[((i+ni)+sizex*(j+nj))*Nmats+mat] / dsqr[(nj+1)*3 + (ni+1)]; \
+							Nn += 1; \
+						} \
+					} \
+				} \
+				rho[(i+sizex*j)*Nmats+mat] = rho_sum / Nn; \
+			} \
+			else { \
+				rho[(i+sizex*j)*Nmats+mat] = 0.0; \
+			} \
+		} \
+	} while (0)
 
-			// There are at most 9 neighbours in 2D case.
-			double dsqr[9];
+	int j, i;
 
-			for (int nj = -1; nj <= 1; nj++) {
-				if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
-					continue;
+	// j fixed
+	j = 0;
+	for (i = 1; i < sizex - 1; i++) {
+		LOOP_BODY(0, 1, -1, 1);
+	}
+	j = sizey - 1;
+	for (i = 1; i < sizex - 1; i++) {
+		LOOP_BODY(-1, 0, -1, 1);
+	}
 
-				for (int ni = -1; ni <= 1; ni++) {
-					if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
-						continue;
+	// i fixed
+	i = 0;
+	for (j = 1; j < sizey - 1; j++) {
+		LOOP_BODY(-1, 1, 0, 1);
+	}	
+	i = sizex - 1;
+	for (j = 1; j < sizey - 1; j++) {
+		LOOP_BODY(-1, 1, -1, 0);
+	}
 
-					dsqr[(nj+1)*3 + (ni+1)] = 0.0;
+	// corners
+	j = 0; i = 0;
+	LOOP_BODY(0, 1, 0, 1);
 
-					// i: inner
-					double xi = x[(i+ni)+sizex*(j+nj)];
-					double yi = y[(i+ni)+sizex*(j+nj)];
+	j = 0; i = sizex - 1;
+	LOOP_BODY(0, 1, -1, 0);
 
-					dsqr[(nj+1)*3 + (ni+1)] += (xo - xi) * (xo - xi);
-					dsqr[(nj+1)*3 + (ni+1)] += (yo - yi) * (yo - yi);
-				}
-			}
+	j = sizey - 1; i = 0;
+	LOOP_BODY(-1, 0, 0, 1);
 
-			for (int mat = 0; mat < Nmats; mat++) {
-				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
-					double rho_sum = 0.0;
-					int Nn = 0;
+	j = sizey - 1; i = sizex - 1;
+	LOOP_BODY(-1, 0, -1, 0);
 
-					for (int nj = -1; nj <= 1; nj++) {
-						if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
-							continue;
-
-						for (int ni = -1; ni <= 1; ni++) {
-							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
-								continue;
-
-							if (Vf[((i+ni)+sizex*(j+nj))*Nmats+mat] > 0.0) {
-								rho_sum += rho[((i+ni)+sizex*(j+nj))*Nmats+mat] / dsqr[(nj+1)*3 + (ni+1)];
-								Nn += 1;
-							}
-						}
-					}
-					rho[(i+sizex*j)*Nmats+mat] = rho_sum / Nn;
-				}
-				else {
-					rho[(i+sizex*j)*Nmats+mat] = 0.0;
-				}
-			}
+	for (j = 1; j < sizey - 1; j++) {
+		for (i = 1; i < sizex - 1; i++) {
+			LOOP_BODY(-1, 1, -1, 1);
 		}
 	}
+
+#undef LOOP_BODY
 }
 
 void full_matrix_material_centric(int sizex, int sizey, int Nmats,
@@ -141,49 +171,85 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 	}
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
+#define LOOP_BODY(nj_min, nj_max, ni_min, ni_max) \
+	do { \
+		if (Vf[ncells*mat + i+sizex*j] > 0.0) { \
+			/* o: outer */ \
+			double xo = x[i+sizex*j]; \
+			double yo = y[i+sizex*j]; \
+			\
+			double rho_sum = 0.0; \
+			int Nn = 0; \
+			\
+			for (int nj = nj_min; nj <= nj_max; nj++) { \
+				for (int ni = ni_min; ni <= ni_max; ni++) { \
+					if (Vf[ncells*mat + (i+ni)+sizex*(j+nj)] > 0.0) { \
+						double dsqr = 0.0; \
+						\
+						/* i: inner */ \
+						double xi = x[(i+ni)+sizex*(j+nj)]; \
+						double yi = y[(i+ni)+sizex*(j+nj)]; \
+						\
+						dsqr += (xo - xi) * (xo - xi); \
+						dsqr += (yo - yi) * (yo - yi); \
+						\
+						rho_sum += rho[ncells*mat + i+sizex*j] / dsqr; \
+						Nn += 1; \
+					} \
+				} \
+			} \
+			\
+			rho[ncells*mat + i+sizex*j] = rho_sum / Nn; \
+		} \
+		else { \
+			rho[ncells*mat + i+sizex*j] = 0.0; \
+		} \
+	} while (0)
+
 	for (int mat = 0; mat < Nmats; mat++) {
-		for (int j = 0; j < sizey; j++) {
-			for (int i = 0; i < sizex; i++) {
-				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
-					// o: outer
-					double xo = x[i+sizex*j];
-					double yo = y[i+sizex*j];
+		int j, i;
 
-					double rho_sum = 0.0;
-					int Nn = 0;
+		// j fixed
+		j = 0;
+		for (i = 1; i < sizex - 1; i++) {
+			LOOP_BODY(0, 1, -1, 1);
+		}
+		j = sizey - 1;
+		for (i = 1; i < sizex - 1; i++) {
+			LOOP_BODY(-1, 0, -1, 1);
+		}
 
-					for (int nj = -1; nj <= 1; nj++) {
-						if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
-							continue;
+		// i fixed
+		i = 0;
+		for (j = 1; j < sizey - 1; j++) {
+			LOOP_BODY(-1, 1, 0, 1);
+		}	
+		i = sizex - 1;
+		for (j = 1; j < sizey - 1; j++) {
+			LOOP_BODY(-1, 1, -1, 0);
+		}
 
-						for (int ni = -1; ni <= 1; ni++) {
-							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
-								continue;
+		// corners
+		j = 0; i = 0;
+		LOOP_BODY(0, 1, 0, 1);
 
-							if (Vf[ncells*mat + (i+ni)+sizex*(j+nj)] > 0.0) {
-								double dsqr = 0.0;
+		j = 0; i = sizex - 1;
+		LOOP_BODY(0, 1, -1, 0);
 
-								// i: inner
-								double xi = x[(i+ni)+sizex*(j+nj)];
-								double yi = y[(i+ni)+sizex*(j+nj)];
+		j = sizey - 1; i = 0;
+		LOOP_BODY(-1, 0, 0, 1);
 
-								dsqr += (xo - xi) * (xo - xi);
-								dsqr += (yo - yi) * (yo - yi);
+		j = sizey - 1; i = sizex - 1;
+		LOOP_BODY(-1, 0, -1, 0);
 
-								rho_sum += rho[ncells*mat + i+sizex*j] / dsqr;
-								Nn += 1;
-							}
-						}
-					}
-
-					rho[ncells*mat + i+sizex*j] = rho_sum / Nn;
-				}
-				else {
-					rho[ncells*mat + i+sizex*j] = 0.0;
-				}
+		for (j = 1; j < sizey - 1; j++) {
+			for (i = 1; i < sizex - 1; i++) {
+				LOOP_BODY(-1, 1, -1, 1);
 			}
 		}
 	}
+
+#undef LOOP_BODY
 }
 
 bool full_matrix_check_results(int sizex, int sizey, int Nmats,
