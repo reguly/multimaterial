@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Ofast -mavx2 -ftree-vectorizer-verbose=1 -fopt-info-vec
+CFLAGS=-Ofast -mavx2
 
 .cpp.o:
 	$(CC) -c $(CFLAGS) $<
