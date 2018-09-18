@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdio.h>
+#include <omp.h>
 
 void compact_cell_centric(int sizex, int sizey,
 	int *imaterial, int *matids, int *nextfrac,
@@ -11,6 +12,8 @@ void compact_cell_centric(int sizex, int sizey,
 {
 	// Cell-centric algorithms
 	// Computational loop 1 - average density in cell
+  double t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(2)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			double ave = 0.0;
@@ -31,8 +34,11 @@ void compact_cell_centric(int sizex, int sizey,
 			}
 		}
 	}
+  printf("Compact matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 2 - Pressure for each cell and each material
+  t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(2)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			int ix = imaterial[i+sizex*j];
@@ -56,8 +62,11 @@ void compact_cell_centric(int sizex, int sizey,
 			}
 		}
 	}
+  printf("Compact matrix, cell centric, alg 2: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
+  t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(2)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			// o: outer
@@ -194,6 +203,7 @@ void compact_cell_centric(int sizex, int sizey,
 			} // end else
 		}
 	}
+  printf("Compact matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
 }
 
 bool compact_check_results(int sizex, int sizey, int Nmats,

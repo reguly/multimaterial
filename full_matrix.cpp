@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdio.h>
+#include <omp.h>
 
 void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 	double *rho, double *p, double *Vf, double *t,
@@ -8,6 +9,8 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 {
 	// Cell-centric algorithms
 	// Computational loop 1 - average density in cell
+  double t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(2)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++){
 			double ave = 0.0;
@@ -19,8 +22,11 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 			rho_ave[i+sizex*j] = ave/V[i+sizex*j];
 		}
 	}
+  printf("Full matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 2 - Pressure for each cell and each material
+  t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(3)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			for (int mat = 0; mat < Nmats; mat++) {
@@ -34,8 +40,11 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 			}
 		}
 	}
+  printf("Full matrix, cell centric, alg 2: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
+  t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(2)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			// o: outer
@@ -91,6 +100,7 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 			}
 		}
 	}
+  printf("Full matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
 }
 
 void full_matrix_material_centric(int sizex, int sizey, int Nmats,
@@ -102,6 +112,8 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 
 	// Material-centric algorithms
 	// Computational loop 1 - average density in cell
+  double t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(2)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			rho_ave[i+sizex*j] = 0.0;
@@ -109,6 +121,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 	}
 
 	for (int mat = 0; mat < Nmats; mat++) {
+    #pragma omp parallel for collapse(2)
 		for (int j = 0; j < sizey; j++) {
 			for (int i = 0; i < sizex; i++) {
 				// Optimisation:
@@ -118,18 +131,21 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 		}
 	}
 
+  #pragma omp parallel for collapse(2)
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			rho_ave[i+sizex*j] /= V[i+sizex*j];
 		}
 	}
+  printf("Full matrix, material centric, alg 1: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 2 - Pressure for each cell and each material
+  t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(3)
 	for (int mat = 0; mat < Nmats; mat++) {
-		double nm = n[mat];
-
 		for (int j = 0; j < sizey; j++) {
 			for (int i = 0; i < sizex; i++) {
+        double nm = n[mat];
 				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
 					p[ncells*mat + i+sizex*j] = (nm * rho[ncells*mat + i+sizex*j] * t[ncells*mat + i+sizex*j]) / Vf[ncells*mat + i+sizex*j];
 				}
@@ -139,8 +155,11 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 			}
 		}
 	}
+  printf("Full matrix, material centric, alg 2: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
+  t1 = omp_get_wtime();
+  #pragma omp parallel for collapse(3)
 	for (int mat = 0; mat < Nmats; mat++) {
 		for (int j = 0; j < sizey; j++) {
 			for (int i = 0; i < sizex; i++) {
@@ -184,6 +203,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 			}
 		}
 	}
+  printf("Full matrix, material centric, alg 2: %g sec\n", omp_get_wtime()-t1);
 }
 
 bool full_matrix_check_results(int sizex, int sizey, int Nmats,

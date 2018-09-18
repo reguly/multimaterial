@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Ofast -mavx2
+CFLAGS=-Ofast -mavx2 -fopenmp
 
 .cpp.o:
 	$(CC) -c $(CFLAGS) $<

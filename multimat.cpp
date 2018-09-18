@@ -66,7 +66,11 @@ extern bool compact_check_results(int sizex, int sizey, int Nmats,
 
 int main(int argc, char* argv[]) {
 	int sizex = 1000;
+  if (argc > 1)
+    sizex = atoi(argv[1]);
 	int sizey = 1000;
+  if (argc > 2)
+    sizey = atoi(argv[2]);
 	int ncells = sizex*sizey;
 
 	int Nmats = 50;
@@ -117,7 +121,8 @@ int main(int argc, char* argv[]) {
 	int *imaterial = (int*)malloc(ncells*sizeof(int));
 
 	// List
-	int list_size = 49000 * 2 + 600 * 3 + 400 * 4;
+  double mul = ceil((double)sizex/1000.0) * ceil((double)sizey/1000.0);
+	int list_size = mul * 49000 * 2 + 600 * 3 + 400 * 4;
 
 	int *nextfrac = (int*)malloc(list_size*sizeof(int));
 	int *frac2cell = (int*)malloc(list_size*sizeof(int));
@@ -149,6 +154,7 @@ int main(int argc, char* argv[]) {
 	int width = sizex/Nmats;
 	//Top
 	for (int mat = 0; mat < Nmats/2; mat++) {
+#pragma omp parallel for
 		for (int j = mat*width; j < sizey/2; j++) {
 			for (int i = mat*width-(mat>0); i < (mat+1)*width; i++) { //+1 for overlap
 				rho[(i+sizex*j)*Nmats+mat] = 1.0;
@@ -162,6 +168,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
+#pragma omp parallel for
 		for (int j = mat*width-(mat>0); j < (mat+1)*width; j++) { //+1 for overlap
 			for (int i = mat*width-(mat>0); i < sizex-mat*width; i++) {
 				rho[(i+sizex*j)*Nmats+mat] = 1.0;
@@ -173,6 +180,7 @@ int main(int argc, char* argv[]) {
 	
 	//Bottom
 	for (int mat = 0; mat < Nmats/2; mat++) {
+#pragma omp parallel for
 		for (int j = sizey/2-1; j < sizey-mat*width; j++) {
 			for (int i = mat*width-(mat>0); i < (mat+1)*width; i++) { //+1 for overlap
 				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
@@ -185,6 +193,7 @@ int main(int argc, char* argv[]) {
 				p[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
 			}
 		}
+#pragma omp parallel for
 		for (int j = sizey-mat*width-1; j >= sizey-(mat+1)*width-(mat<(Nmats/2-1)); j--) { //+1 for overlap
 			for (int i = mat*width; i < sizex-mat*width; i++) {
 				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
@@ -194,6 +203,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	//Fill in corners
+#pragma omp parallel for
 	for (int mat = 1; mat < Nmats/2; mat++) {
 		for (int j = sizey/2-3; j < sizey/2-1;j++)
 			for (int i = 2; i < 5; i++) {
@@ -249,6 +259,7 @@ int main(int argc, char* argv[]) {
 				rho[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;
 			}
 	}
+#pragma omp parallel for
 	for (int mat=Nmats/2+1; mat < Nmats/2+5; mat++) {
 		int i = 2; int j = sizey/2+1;
 		rho[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat] = 0.0;t[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;p[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;
@@ -296,6 +307,7 @@ int main(int argc, char* argv[]) {
 		fclose(f);
 
 	// Convert representation to material-centric (using extra buffers)
+#pragma omp parallel for
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			for (int mat = 0; mat < Nmats; mat++) {
