@@ -7,11 +7,24 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 	double *V, double *x, double *y,
 	double *n, double *rho_ave)
 {
+#if defined(ACC)
+#pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
+  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey])
+#endif
+{
 	// Cell-centric algorithms
 	// Computational loop 1 - average density in cell
   double t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++){
 			double ave = 0.0;
 			for (int mat = 0; mat < Nmats; mat++) {
@@ -26,9 +39,20 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(3)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 			for (int mat = 0; mat < Nmats; mat++) {
 				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
 					double nm = n[mat];
@@ -44,8 +68,16 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++) {
 			// o: outer
 			double xo = x[i+sizex*j];
@@ -102,6 +134,7 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 	}
   printf("Full matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
 }
+}
 
 void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 	double *rho, double *p, double *Vf, double *t,
@@ -109,20 +142,40 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 	double *n, double *rho_ave)
 {
 	int ncells = sizex * sizey;
-
+#if defined(ACC)
+#pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
+  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey])
+#endif
+  {
 	// Material-centric algorithms
 	// Computational loop 1 - average density in cell
   double t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++) {
 			rho_ave[i+sizex*j] = 0.0;
 		}
 	}
 
 	for (int mat = 0; mat < Nmats; mat++) {
-    #pragma omp parallel for collapse(2)
+    #if defined(OMP)
+  #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 		for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 			for (int i = 0; i < sizex; i++) {
 				// Optimisation:
 				if (Vf[ncells*mat + i+sizex*j] > 0.0)
@@ -131,8 +184,16 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 		}
 	}
 
+  #if defined(OMP)
   #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++) {
 			rho_ave[i+sizex*j] /= V[i+sizex*j];
 		}
@@ -141,9 +202,20 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(3)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int mat = 0; mat < Nmats; mat++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 			for (int i = 0; i < sizex; i++) {
         double nm = n[mat];
 				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
@@ -159,9 +231,20 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(3)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int mat = 0; mat < Nmats; mat++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 			for (int i = 0; i < sizex; i++) {
 				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
 					// o: outer
@@ -204,6 +287,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 		}
 	}
   printf("Full matrix, material centric, alg 2: %g sec\n", omp_get_wtime()-t1);
+  }
 }
 
 bool full_matrix_check_results(int sizex, int sizey, int Nmats,

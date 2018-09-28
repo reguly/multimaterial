@@ -50,106 +50,23 @@ extern bool full_matrix_check_results(int sizex, int sizey, int Nmats,
 	double *rho_ave, double *rho_ave_mat, double *p, double *p_mat,
 	double *rho, double *rho_mat);
 
-extern void compact_cell_centric(int sizex, int sizey,
+extern void compact_cell_centric(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *x, double *y, double *n,
 	double *rho_compact, double *rho_compact_list, double *rho_ave_compact,
 	double *p_compact, double *p_compact_list,
 	double *t_compact, double *t_compact_list,
-	double *V, double *Vf_compact_list);
+	double *V, double *Vf_compact_list, int mm_len,
+	int mmc_cells, int *mmc_index, int *mmc_i, int *mmc_j);
 
 extern bool compact_check_results(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *rho_ave, double *rho_ave_compact,
 	double *p, double *p_compact, double *p_compact_list,
-	double *rho, double *rho_compact, double *rho_compact_list);
+	double *rho, double *rho_compact, double *rho_compact_list, int *mmc_index);
 
-int main(int argc, char* argv[]) {
-	int sizex = 1000;
-  if (argc > 1)
-    sizex = atoi(argv[1]);
-	int sizey = 1000;
-  if (argc > 2)
-    sizey = atoi(argv[2]);
-	int ncells = sizex*sizey;
 
-	int Nmats = 50;
-
-	//Allocate the four state variables for all Nmats materials and all cells 
-	//density
-	double *rho =  (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(rho, 0, Nmats*ncells*sizeof(double));
-	//pressure
-	double *p = (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(p, 0, Nmats*ncells*sizeof(double));
-	//Fractional volume
-	double *Vf = (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(Vf, 0, Nmats*ncells*sizeof(double));
-	//temperature
-	double *t = (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(t, 0, Nmats*ncells*sizeof(double));
-
-	// Buffers for material-centric representation
-	//density
-	double *rho_mat =  (double*)malloc(Nmats*ncells*sizeof(double));
-	//pressure
-	double *p_mat = (double*)malloc(Nmats*ncells*sizeof(double));
-	//Fractional volume
-	double *Vf_mat = (double*)malloc(Nmats*ncells*sizeof(double));
-	//temperature
-	double *t_mat = (double*)malloc(Nmats*ncells*sizeof(double));
-
-	//Allocate per-cell only datasets
-	double *V = (double*)malloc(ncells*sizeof(double));
-	double *x = (double*)malloc(ncells*sizeof(double));
-	double *y = (double*)malloc(ncells*sizeof(double));
-
-	//Allocate per-material only datasets
-	double *n = (double*)malloc(Nmats*sizeof(double)); // number of moles
-
-	//Allocate output datasets
-	double *rho_ave = (double*)malloc(ncells*sizeof(double));
-	double *rho_ave_mat = (double*)malloc(ncells*sizeof(double));
-	double *rho_ave_compact = (double*)malloc(ncells*sizeof(double));
-
-	// Cell-centric compact storage
-	double *rho_compact = (double*)malloc(ncells*sizeof(double));
-	double *p_compact = (double*)malloc(ncells*sizeof(double));
-	double *t_compact = (double*)malloc(ncells*sizeof(double));
-
-	int *nmats = (int*)malloc(ncells*sizeof(int));
-	int *imaterial = (int*)malloc(ncells*sizeof(int));
-
-	// List
-  double mul = ceil((double)sizex/1000.0) * ceil((double)sizey/1000.0);
-	int list_size = mul * 49000 * 2 + 600 * 3 + 400 * 4;
-
-	int *nextfrac = (int*)malloc(list_size*sizeof(int));
-	int *frac2cell = (int*)malloc(list_size*sizeof(int));
-	int *matids = (int*)malloc(list_size*sizeof(int));
-
-	double *Vf_compact_list = (double*)malloc(list_size*sizeof(double));
-	double *rho_compact_list = (double*)malloc(list_size*sizeof(double));
-	double *t_compact_list = (double*)malloc(list_size*sizeof(double));
-	double *p_compact_list = (double*)malloc(list_size*sizeof(double));
-
-	int imaterial_multi_cell;
-
-	//Initialise arrays
-	double dx = 1.0/sizex;
-	double dy = 1.0/sizey;
-	for (int j = 0; j < sizey; j++) {
-		for (int i = 0; i < sizex; i++) {
-			V[i+j*sizex] = dx*dy;
-			x[i+j*sizex] = dx*i;
-			y[i+j*sizex] = dy*j;
-		}
-	}
-
-	for (int mat = 0; mat < Nmats; mat++) {
-		n[mat] = 1.0; // dummy value
-	}
-
+  void initialise_field_static(double *rho, double *t, double *p, int Nmats, int sizex, int sizey) {
 	//Pure cells and simple overlaps
 	int width = sizex/Nmats;
 	//Top
@@ -264,6 +181,103 @@ int main(int argc, char* argv[]) {
 		int i = 2; int j = sizey/2+1;
 		rho[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat] = 0.0;t[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;p[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;
 	}
+}
+int main(int argc, char* argv[]) {
+	int sizex = 1000;
+  if (argc > 1)
+    sizex = atoi(argv[1]);
+	int sizey = 1000;
+  if (argc > 2)
+    sizey = atoi(argv[2]);
+	int ncells = sizex*sizey;
+
+	int Nmats = 50;
+
+	//Allocate the four state variables for all Nmats materials and all cells 
+	//density
+	double *rho =  (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(rho, 0, Nmats*ncells*sizeof(double));
+	//pressure
+	double *p = (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(p, 0, Nmats*ncells*sizeof(double));
+	//Fractional volume
+	double *Vf = (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(Vf, 0, Nmats*ncells*sizeof(double));
+	//temperature
+	double *t = (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(t, 0, Nmats*ncells*sizeof(double));
+
+	// Buffers for material-centric representation
+	//density
+	double *rho_mat =  (double*)malloc(Nmats*ncells*sizeof(double));
+	//pressure
+	double *p_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+	//Fractional volume
+	double *Vf_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+	//temperature
+	double *t_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+
+	//Allocate per-cell only datasets
+	double *V = (double*)malloc(ncells*sizeof(double));
+	double *x = (double*)malloc(ncells*sizeof(double));
+	double *y = (double*)malloc(ncells*sizeof(double));
+
+	//Allocate per-material only datasets
+	double *n = (double*)malloc(Nmats*sizeof(double)); // number of moles
+
+	//Allocate output datasets
+	double *rho_ave = (double*)malloc(ncells*sizeof(double));
+	double *rho_ave_mat = (double*)malloc(ncells*sizeof(double));
+	double *rho_ave_compact = (double*)malloc(ncells*sizeof(double));
+
+	// Cell-centric compact storage
+	double *rho_compact = (double*)malloc(ncells*sizeof(double));
+	double *p_compact = (double*)malloc(ncells*sizeof(double));
+	double *t_compact = (double*)malloc(ncells*sizeof(double));
+
+	int *nmats = (int*)malloc(ncells*sizeof(int));
+	int *imaterial = (int*)malloc(ncells*sizeof(int));
+
+	// List
+    double mul = ceil((double)sizex/1000.0) * ceil((double)sizey/1000.0);
+	int list_size = mul * 49000 * 2 + 600 * 3 + 400 * 4;
+
+	//plain linked list
+	int *nextfrac = (int*)malloc(list_size*sizeof(int));
+	int *frac2cell = (int*)malloc(list_size*sizeof(int));
+	int *matids = (int*)malloc(list_size*sizeof(int));
+
+	//CSR list
+	int mmc_cells;
+	int *mmc_index = (int *)malloc(list_size*sizeof(int)); //CSR mapping for mix cell idx -> compact list position
+	int *mmc_i = (int *)malloc(list_size*sizeof(int)); // mixed cell -> physical cell i coord
+	int *mmc_j = (int *)malloc(list_size*sizeof(int)); //  mixed cell -> physical cell j coord
+	
+
+
+	double *Vf_compact_list = (double*)malloc(list_size*sizeof(double));
+	double *rho_compact_list = (double*)malloc(list_size*sizeof(double));
+	double *t_compact_list = (double*)malloc(list_size*sizeof(double));
+	double *p_compact_list = (double*)malloc(list_size*sizeof(double));
+
+	int imaterial_multi_cell;
+
+	//Initialise arrays
+	double dx = 1.0/sizex;
+	double dy = 1.0/sizey;
+	for (int j = 0; j < sizey; j++) {
+		for (int i = 0; i < sizex; i++) {
+			V[i+j*sizex] = dx*dy;
+			x[i+j*sizex] = dx*i;
+			y[i+j*sizex] = dy*j;
+		}
+	}
+
+	for (int mat = 0; mat < Nmats; mat++) {
+		n[mat] = 1.0; // dummy value
+	}
+
+	initialise_field_static(rho, t, p, Nmats, sizex, sizey);
 
 	FILE *f;
 	int print_to_file = 0;
@@ -273,6 +287,7 @@ int main(int argc, char* argv[]) {
 
 	//Compute fractions and count cells
 	int cell_counts_by_mat[4] = {0,0,0,0};
+	mmc_cells = 0;
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			int count = 0;
@@ -286,6 +301,8 @@ int main(int argc, char* argv[]) {
 
 				goto end;
 			}
+			if (count > 1) mmc_cells++;
+
 			cell_counts_by_mat[count-1]++;
 
 			if (print_to_file) {
@@ -300,8 +317,8 @@ int main(int argc, char* argv[]) {
 		if (print_to_file)
 			fprintf(f,"\n");
 	}
-	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d\n",
-		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3]);
+	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d: MMC cells %d\n",
+		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3], mmc_cells);
 
 	if (print_to_file)
 		fclose(f);
@@ -321,7 +338,7 @@ int main(int argc, char* argv[]) {
 
 	// Copy data from cell-centric full matrix storage to cell-centric compact storage
 	imaterial_multi_cell = 0;
-
+	mmc_cells = 0;
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			int mat_indices[4] = { -1, -1, -1, -1 };
@@ -352,7 +369,15 @@ int main(int argc, char* argv[]) {
 			else { // count > 1
 				nmats[i+sizex*j] = count;
 				// note the minus sign, it needs to be negative
+#ifdef LINKED
 				imaterial[i+sizex*j] = -imaterial_multi_cell;
+#else
+				imaterial[i+sizex*j] = -mmc_cells;
+#endif
+				mmc_index[mmc_cells] = imaterial_multi_cell;
+				mmc_i[mmc_cells] = i;
+				mmc_j[mmc_cells] = j;
+				mmc_cells++;
 
 				for (int list_idx = imaterial_multi_cell; list_idx < imaterial_multi_cell + count; ++list_idx) {
 					// if last iteration
@@ -376,6 +401,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
+	mmc_index[mmc_cells] = imaterial_multi_cell;
 
 	full_matrix_cell_centric(sizex, sizey, Nmats, rho, p, Vf, t, V, x, y, n, rho_ave);
 	full_matrix_material_centric(sizex, sizey, Nmats, rho_mat, p_mat, Vf_mat, t_mat, V, x, y, n, rho_ave_mat);
@@ -385,12 +411,13 @@ int main(int argc, char* argv[]) {
 	}
 
 
-	compact_cell_centric(sizex, sizey, imaterial, matids, nextfrac, x, y, n,
+	compact_cell_centric(sizex, sizey, Nmats, imaterial, matids, nextfrac, x, y, n,
 		rho_compact, rho_compact_list, rho_ave_compact, p_compact, p_compact_list,
-		t_compact, t_compact_list, V, Vf_compact_list);
+		t_compact, t_compact_list, V, Vf_compact_list, imaterial_multi_cell,
+		mmc_cells, mmc_index, mmc_i, mmc_j);
 	// Check results
 	if (!compact_check_results(sizex, sizey, Nmats, imaterial, matids, nextfrac,
-			rho_ave, rho_ave_compact, p, p_compact, p_compact_list, rho, rho_compact, rho_compact_list))
+			rho_ave, rho_ave_compact, p, p_compact, p_compact_list, rho, rho_compact, rho_compact_list, mmc_index))
 	{
 		goto end;
 	}

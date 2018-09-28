@@ -2,57 +2,112 @@
 #include <stdio.h>
 #include <omp.h>
 
-void compact_cell_centric(int sizex, int sizey,
+void compact_cell_centric(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *x, double *y, double *n,
 	double *rho_compact, double *rho_compact_list, double *rho_ave_compact,
 	double *p_compact, double *p_compact_list,
 	double *t_compact, double *t_compact_list,
-	double *V, double *Vf_compact_list)
+	double *V, double *Vf_compact_list, int mm_len, int mmc_cells, int *mmc_index, int *mmc_i, int *mmc_j)
 {
+  #if defined(ACC)
+  #pragma acc data copy(imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells])
+  #endif
+  { 
 	// Cell-centric algorithms
 	// Computational loop 1 - average density in cell
   double t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++) {
+
+#ifdef FUSED
 			double ave = 0.0;
 			int ix = imaterial[i+sizex*j];
-
 			if (ix <= 0) {
 				// condition is 'ix >= 0', this is the equivalent of
 				// 'until ix < 0' from the paper
+#ifdef LINKED
 				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
 					ave += rho_compact_list[ix] * Vf_compact_list[ix];
 				}
+#else
+				for (int idx = mmc_index[-ix]; idx < mmc_index[-ix+1]; idx++) {
+					ave += rho_compact_list[idx] * Vf_compact_list[idx];	
+				}
+#endif
 				rho_ave_compact[i+sizex*j] = ave/V[i+sizex*j];
 			}
 			else {
+#endif
 				// We use a distinct output array for averages.
 				// In case of a pure cell, the average density equals to the total.
 				rho_ave_compact[i+sizex*j] = rho_compact[i+sizex*j] / V[i+sizex*j];
+#ifdef FUSED
 			}
+#endif
 		}
 	}
+#ifndef FUSED
+  #if defined(OMP)
+  #pragma omp parallel for
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
+  for (int c = 0; c < mmc_cells; c++) {
+    double ave = 0.0;
+    for (int m = mmc_index[c]; m < mmc_index[c+1]; m++) {
+      ave +=  rho_compact_list[m] * Vf_compact_list[m];
+    }
+    rho_ave_compact[mmc_i[c]+sizex*mmc_j[c]] = ave/V[mmc_i[c]+sizex*mmc_j[c]];
+  }
+#endif
   printf("Compact matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++) {
 			int ix = imaterial[i+sizex*j];
 
+
 			if (ix <= 0) {
+#ifdef FUSED
 				// NOTE: I think the paper describes this algorithm (Alg. 9) wrong.
 				// The solution below is what I believe to good.
 
 				// condition is 'ix >= 0', this is the equivalent of
 				// 'until ix < 0' from the paper
+#ifdef LINKED
 				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
 					double nm = n[matids[ix]];
 					p_compact_list[ix] = (nm * rho_compact_list[ix] * t_compact_list[ix]) / Vf_compact_list[ix];
 				}
+#else
+				for (int idx = mmc_index[-ix]; idx < mmc_index[-ix+1]; idx++) {
+					double nm = n[matids[idx]];
+					p_compact_list[idx] = (nm * rho_compact_list[idx] * t_compact_list[idx]) / Vf_compact_list[idx];
+				}
+#endif
+#endif
 			}
 			else {
 				// NOTE: HACK: we index materials from zero, but zero can be a list index
@@ -62,12 +117,33 @@ void compact_cell_centric(int sizex, int sizey,
 			}
 		}
 	}
+#ifndef FUSED
+  #if defined(OMP)
+  #pragma omp parallel for
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
+  for (int idx = 0; idx < mmc_index[mmc_cells]; idx++) {
+    double nm = n[matids[idx]];
+    p_compact_list[idx] = (nm * rho_compact_list[idx] * t_compact_list[idx]) / Vf_compact_list[idx];
+  }
+#endif
+
   printf("Compact matrix, cell centric, alg 2: %g sec\n", omp_get_wtime()-t1);
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
+  #if defined(OMP)
   #pragma omp parallel for collapse(2)
+  #elif defined(ACC)
+  #pragma acc parallel
+  #pragma acc loop independent
+  #endif
 	for (int j = 0; j < sizey; j++) {
+  #if defined(ACC)
+  #pragma acc loop independent
+  #endif
 		for (int i = 0; i < sizex; i++) {
 			// o: outer
 			double xo = x[i+sizex*j];
@@ -101,7 +177,12 @@ void compact_cell_centric(int sizex, int sizey,
 			if (ix <= 0) {
 				// condition is 'ix >= 0', this is the equivalent of
 				// 'until ix < 0' from the paper
+				#ifdef LINKED
 				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
+				#else
+				for (int ix = mmc_index[-imaterial[i+sizex*j]]; ix < mmc_index[-imaterial[i+sizex*j]+1]; ix++) {
+				#endif
+
 					int mat = matids[ix];
 					double rho_sum = 0.0;
 					int Nn = 0;
@@ -121,7 +202,11 @@ void compact_cell_centric(int sizex, int sizey,
 							if (jx <= 0) {
 								// condition is 'jx >= 0', this is the equivalent of
 								// 'until jx < 0' from the paper
+								#ifdef LINKED
 								for (jx = -jx; jx >= 0; jx = nextfrac[jx]) {
+								#else
+								for (int jx = mmc_index[-imaterial[ci+sizex*cj]]; jx < mmc_index[-imaterial[ci+sizex*cj]+1]; jx++) {
+								#endif
 									if (matids[jx] == mat) {
 										rho_sum += rho_compact_list[jx] / dsqr[(nj+1)*3 + (ni+1)];
 										Nn += 1;
@@ -174,7 +259,11 @@ void compact_cell_centric(int sizex, int sizey,
 						if (jx <= 0) {
 							// condition is 'jx >= 0', this is the equivalent of
 							// 'until jx < 0' from the paper
+							#ifdef LINKED
 							for (jx = -jx; jx >= 0; jx = nextfrac[jx]) {
+							#else
+							for (int jx = mmc_index[-imaterial[ci+sizex*cj]]; jx < mmc_index[-imaterial[ci+sizex*cj]+1]; jx++) {
+							#endif
 								if (matids[jx] == mat) {
 									rho_sum += rho_compact_list[jx] / dsqr[(nj+1)*3 + (ni+1)];
 									Nn += 1;
@@ -204,13 +293,14 @@ void compact_cell_centric(int sizex, int sizey,
 		}
 	}
   printf("Compact matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
+  }
 }
 
 bool compact_check_results(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *rho_ave, double *rho_ave_compact,
 	double *p, double *p_compact, double *p_compact_list,
-	double *rho, double *rho_compact, double *rho_compact_list)
+	double *rho, double *rho_compact, double *rho_compact_list, int *mmc_index)
 {
 	printf("Checking results of compact representation... ");
 
@@ -221,10 +311,13 @@ bool compact_check_results(int sizex, int sizey, int Nmats,
 					rho_ave[i+sizex*j], rho_ave_compact[i+sizex*j], i, j);
 				return false;
 			}
-
 			int ix = imaterial[i+sizex*j];
 			if (ix <= 0) {
+#ifdef LINKED
 				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
+#else
+        for (int ix = mmc_index[-imaterial[i+sizex*j]]; ix < mmc_index[-imaterial[i+sizex*j]+1]; ix++) {
+#endif
 					int mat = matids[ix];
 					if (abs(p[(i+sizex*j)*Nmats+mat] - p_compact_list[ix]) > 0.0001) {
 						printf("2. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
