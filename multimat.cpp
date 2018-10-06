@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 
 extern void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 	double *rho, double *p, double *Vf, double *t,
@@ -65,20 +66,67 @@ extern bool compact_check_results(int sizex, int sizey, int Nmats,
 	double *p, double *p_compact, double *p_compact_list,
 	double *rho, double *rho_compact, double *rho_compact_list, int *mmc_index);
 
+void initialise_field_rand(double *rho, double *t, double *p, int Nmats, int sizex, int sizey, double prob2, double prob3, double prob4) {
+
+  //let's use a morton space filling curve here
+  srand(0);
+  double prob1 = 1.0-prob2-prob3-prob4;
+  printf("Random layout %g %g %g %g\n", prob1, prob2, prob3, prob4);
+
+  for (int n = 0; n < sizex*sizey; n++) {
+    int i = n%sizex;//n & 0xAAAA;
+    int j = n/sizex;//n & 0x5555;
+
+    double r = (double)rand()/(double)RAND_MAX;
+    int m = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+    int m2, m3, m4;
+    rho[(i+sizex*j)*Nmats+m] = 1.0;
+    t[(i+sizex*j)*Nmats+m] = 1.0;
+    p[(i+sizex*j)*Nmats+m] = 1.0;
+    if (r >= prob1) {
+      m2 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      while (m2 == m)
+        m2 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      rho[(i+sizex*j)*Nmats+m2] = 1.0;
+      t[(i+sizex*j)*Nmats+m2] = 1.0;
+      p[(i+sizex*j)*Nmats+m2] = 1.0;
+    }
+    if (r >= 1.0-prob4-prob3) {
+      m3 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      while (m3 == m && m3 == m2)
+        m3 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      rho[(i+sizex*j)*Nmats+m3] = 1.0;
+      t[(i+sizex*j)*Nmats+m3] = 1.0;
+      p[(i+sizex*j)*Nmats+m3] = 1.0;
+    }
+    if (r >= 1.0-prob4) {
+      m4 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      while (m4 == m && m4 == m2 && m4 == m3)
+        m4 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      rho[(i+sizex*j)*Nmats+m4] = 1.0;
+      t[(i+sizex*j)*Nmats+m4] = 1.0;
+      p[(i+sizex*j)*Nmats+m4] = 1.0;
+    }
+  }
+}
 
   void initialise_field_static(double *rho, double *t, double *p, int Nmats, int sizex, int sizey) {
 	//Pure cells and simple overlaps
 	int width = sizex/Nmats;
+
+  int overlap_i = std::max(0.0,ceil((double)sizey/1000.0)-1);
+  int overlap_j = std::max(0.0,floor((double)sizex/1000.0)-1);
+
 	//Top
 	for (int mat = 0; mat < Nmats/2; mat++) {
 #pragma omp parallel for
 		for (int j = mat*width; j < sizey/2; j++) {
-			for (int i = mat*width-(mat>0); i < (mat+1)*width; i++) { //+1 for overlap
+			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < (mat+1)*width; i++) { //+1 for overlap
 				rho[(i+sizex*j)*Nmats+mat] = 1.0;
 				t[(i+sizex*j)*Nmats+mat] = 1.0;
 				p[(i+sizex*j)*Nmats+mat] = 1.0;
 			}
-			for (int i = sizex-mat*width-1; i >= sizex-(mat+1)*width-1; i--) { //+1 for overlap
+			for (int i = sizex-mat*width-1+(mat>0)*overlap_i; i >= sizex-(mat+1)*width-1; i--) { //+1 for overlap
 				rho[(i+sizex*j)*Nmats+mat] = 1.0;
 				t[(i+sizex*j)*Nmats+mat] = 1.0;
 				p[(i+sizex*j)*Nmats+mat] = 1.0;
@@ -87,7 +135,7 @@ extern bool compact_check_results(int sizex, int sizey, int Nmats,
 
 #pragma omp parallel for
 		for (int j = mat*width-(mat>0); j < (mat+1)*width; j++) { //+1 for overlap
-			for (int i = mat*width-(mat>0); i < sizex-mat*width; i++) {
+			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < sizex-mat*width; i++) {
 				rho[(i+sizex*j)*Nmats+mat] = 1.0;
 				t[(i+sizex*j)*Nmats+mat] = 1.0;
 				p[(i+sizex*j)*Nmats+mat] = 1.0;
@@ -111,7 +159,7 @@ extern bool compact_check_results(int sizex, int sizey, int Nmats,
 			}
 		}
 #pragma omp parallel for
-		for (int j = sizey-mat*width-1; j >= sizey-(mat+1)*width-(mat<(Nmats/2-1)); j--) { //+1 for overlap
+		for (int j = sizey-mat*width-1+(mat>0)*overlap_j; j >= sizey-(mat+1)*width-(mat<(Nmats/2-1)); j--) { //+1 for overlap
 			for (int i = mat*width; i < sizex-mat*width; i++) {
 				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
 				t[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
@@ -123,7 +171,7 @@ extern bool compact_check_results(int sizex, int sizey, int Nmats,
 #pragma omp parallel for
 	for (int mat = 1; mat < Nmats/2; mat++) {
 		for (int j = sizey/2-3; j < sizey/2-1;j++)
-			for (int i = 2; i < 5; i++) {
+			for (int i = 2; i < 5+overlap_i; i++) {
 				//x neighbour material
 				rho[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;
 				rho[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;
@@ -134,7 +182,7 @@ extern bool compact_check_results(int sizex, int sizey, int Nmats,
 				rho[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;
 				rho[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;t[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;
 			}
-		for (int j = sizey/2; j < sizey/2+2;j++)
+		for (int j = sizey/2; j < sizey/2+2+overlap_j;j++)
 			for (int i = 2; i < 5; i++) {
 				//x neighbour material
 				rho[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;
@@ -277,7 +325,8 @@ int main(int argc, char* argv[]) {
 		n[mat] = 1.0; // dummy value
 	}
 
-	initialise_field_static(rho, t, p, Nmats, sizex, sizey);
+  if (argc>=6) initialise_field_rand(rho, t, p, Nmats, sizex, sizey, atof(argv[3]), atof(argv[4]), atof(argv[5]));
+  else initialise_field_static(rho, t, p, Nmats, sizex, sizey);
 
 	FILE *f;
 	int print_to_file = 0;
