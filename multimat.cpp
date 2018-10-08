@@ -123,7 +123,7 @@ void initialise_field_rand(double *rho, double *t, double *p, int Nmats, int siz
 	//Top
 	for (int mat = 0; mat < Nmats/2; mat++) {
 #pragma omp parallel for
-		for (int j = mat*width; j < sizey/2; j++) {
+		for (int j = mat*width; j < sizey/2+overlap_j; j++) {
 			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < (mat+1)*width; i++) { //+1 for overlap
 				rho[(i+sizex*j)*Nmats+mat] = 1.0;
 				t[(i+sizex*j)*Nmats+mat] = 1.0;
@@ -137,7 +137,7 @@ void initialise_field_rand(double *rho, double *t, double *p, int Nmats, int siz
 		}
 
 #pragma omp parallel for
-		for (int j = mat*width-(mat>0); j < (mat+1)*width; j++) { //+1 for overlap
+		for (int j = mat*width-(mat>0)-(mat>0)*overlap_j; j < (mat+1)*width; j++) { //+1 for overlap
 			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < sizex-mat*width; i++) {
 				rho[(i+sizex*j)*Nmats+mat] = 1.0;
 				t[(i+sizex*j)*Nmats+mat] = 1.0;
@@ -149,13 +149,13 @@ void initialise_field_rand(double *rho, double *t, double *p, int Nmats, int siz
 	//Bottom
 	for (int mat = 0; mat < Nmats/2; mat++) {
 #pragma omp parallel for
-		for (int j = sizey/2-1; j < sizey-mat*width; j++) {
-			for (int i = mat*width-(mat>0); i < (mat+1)*width; i++) { //+1 for overlap
+		for (int j = sizey/2-1-overlap_j; j < sizey-mat*width; j++) {
+			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < (mat+1)*width; i++) { //+1 for overlap
 				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
 				t[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
 				p[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
 			}
-			for (int i = sizex-mat*width-1; i >= sizex-(mat+1)*width-1; i--) { //+1 for overlap
+			for (int i = sizex-mat*width-1+(mat>0)*overlap_i; i >= sizex-(mat+1)*width-1; i--) { //+1 for overlap
 				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
 				t[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
 				p[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
@@ -301,6 +301,9 @@ int main(int argc, char* argv[]) {
 	// List
     double mul = ceil((double)sizex/1000.0) * ceil((double)sizey/1000.0);
 	int list_size = mul * 49000 * 2 + 600 * 3 + 400 * 4;
+  if (argc>=6)
+     list_size = (double(sizex*sizey)*atof(argv[3])*2+double(sizex*sizey)*atof(argv[4])*3+double(sizex*sizey)*atof(argv[5])*4)*1.1;
+
 
 	//plain linked list
 	int *nextfrac = (int*)malloc(list_size*sizeof(int));
