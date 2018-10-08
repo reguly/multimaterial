@@ -29,7 +29,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma simd
+#pragma omp simd
 		for (int i = 0; i < sizex; i++) {
 
 #ifdef FUSED
@@ -39,6 +39,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 				// condition is 'ix >= 0', this is the equivalent of
 				// 'until ix < 0' from the paper
 #ifdef LINKED
+#pragma novector
 				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
 					ave += rho_compact_list[ix] * Vf_compact_list[ix];
 				}

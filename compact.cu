@@ -97,7 +97,7 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 						  int sizex, int sizey, int * __restrict mmc_index) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
 	int j = threadIdx.y + blockIdx.y * blockDim.y;
-	if (i >= sizex || j >= sizey) return;
+	if (i >= sizex-1 || j >= sizey-1 || i < 1 || j < 1) return;
 
 
 	// o: outer
@@ -109,12 +109,8 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 
 	// for all neighbours
 	for (int nj = -1; nj <= 1; nj++) {
-		if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
-			continue;
 
 		for (int ni = -1; ni <= 1; ni++) {
-			if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
-				continue;
 
 			dsqr[(nj+1)*3 + (ni+1)] = 0.0;
 
@@ -143,12 +139,8 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 
 			// for all neighbours
 			for (int nj = -1; nj <= 1; nj++) {
-				if ((j + nj < 0) || (j + nj >= sizey)) // TODO: better way?
-					continue;
 
 				for (int ni = -1; ni <= 1; ni++) {
-					if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
-						continue;
 
 					int ci = i+ni, cj = j+nj;
 					int jx = imaterial[ci+sizex*cj];

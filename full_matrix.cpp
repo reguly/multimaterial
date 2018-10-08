@@ -28,7 +28,7 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
   #endif
 		for (int i = 0; i < sizex; i++){
 			double ave = 0.0;
-#pragma omp simd reduction(+:ave)
+//#pragma omp simd reduction(+:ave)
 			for (int mat = 0; mat < Nmats; mat++) {
 				// Optimisation:
 				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0)
@@ -55,7 +55,7 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
+//#pragma omp simd
 			for (int mat = 0; mat < Nmats; mat++) {
 				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
 					double nm = n[mat];
@@ -102,7 +102,7 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 					dsqr[(nj+1)*3 + (ni+1)] += (yo - yi) * (yo - yi);
 				}
 			}
-#pragma omp simd
+//#pragma omp simd
 			for (int mat = 0; mat < Nmats; mat++) {
 				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
 					double rho_sum = 0.0;
@@ -159,7 +159,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
+//#pragma omp simd
 		for (int i = 0; i < sizex; i++) {
 			rho_ave[i+sizex*j] = 0.0;
 		}
@@ -176,7 +176,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
+//#pragma omp simd
 			for (int i = 0; i < sizex; i++) {
 				// Optimisation:
 				if (Vf[ncells*mat + i+sizex*j] > 0.0)
@@ -195,7 +195,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
+//#pragma omp simd
 		for (int i = 0; i < sizex; i++) {
 			rho_ave[i+sizex*j] /= V[i+sizex*j];
 		}
@@ -218,7 +218,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
+//#pragma omp simd
 			for (int i = 0; i < sizex; i++) {
         double nm = n[mat];
 				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
@@ -248,7 +248,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
+//#pragma omp simd
 			for (int i = 1; i < sizex-1; i++) {
 				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
 					// o: outer
