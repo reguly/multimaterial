@@ -3,13 +3,14 @@
 #include <omp.h>
 
 void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *p, double *Vf, double *t,
+	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
 	double *V, double *x, double *y,
 	double *n, double *rho_ave)
 {
 #if defined(ACC)
 #pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
-  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey])
+  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey]) \
+  copy(rho_mat_ave[0:sizex*sizey*Nmats])
 #endif
 {
 	// Cell-centric algorithms
@@ -124,10 +125,10 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 							}
 						}
 					}
-					rho[(i+sizex*j)*Nmats+mat] = rho_sum / Nn;
+					rho_mat_ave[(i+sizex*j)*Nmats+mat] = rho_sum / Nn;
 				}
 				else {
-					rho[(i+sizex*j)*Nmats+mat] = 0.0;
+					rho_mat_ave[(i+sizex*j)*Nmats+mat] = 0.0;
 				}
 			}
 		}
@@ -137,14 +138,15 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
 }
 
 void full_matrix_material_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *p, double *Vf, double *t,
+	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
 	double *V, double *x, double *y,
 	double *n, double *rho_ave)
 {
 	int ncells = sizex * sizey;
 #if defined(ACC)
 #pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
-  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey])
+  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey]) \
+  copy(rho_mat_ave[0:sizex*sizey*Nmats])
 #endif
   {
 	// Material-centric algorithms
@@ -278,10 +280,10 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 						}
 					}
 
-					rho[ncells*mat + i+sizex*j] = rho_sum / Nn;
+					rho_mat_ave[ncells*mat + i+sizex*j] = rho_sum / Nn;
 				}
 				else {
-					rho[ncells*mat + i+sizex*j] = 0.0;
+					rho_mat_ave[ncells*mat + i+sizex*j] = 0.0;
 				}
 			}
 		}
@@ -292,7 +294,7 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
 
 bool full_matrix_check_results(int sizex, int sizey, int Nmats,
 	double *rho_ave, double *rho_ave_mat, double *p, double *p_mat,
-	double *rho, double *rho_mat)
+	double *rho, double *rho_mat, double *rho_mat_ave, double *rho_mat_ave_mat)
 {
 	int ncells = sizex * sizey;
 	printf("Checking results of full matrix representation... ");
@@ -312,9 +314,9 @@ bool full_matrix_check_results(int sizex, int sizey, int Nmats,
 					return false;
 				}
 
-				if (abs(rho[(i+sizex*j)*Nmats+mat] - rho_mat[ncells*mat + i+sizex*j]) > 0.0001) {
+				if (abs(rho_mat_ave[(i+sizex*j)*Nmats+mat] - rho_mat_ave_mat[ncells*mat + i+sizex*j]) > 0.0001) {
 					printf("3. cell-centric and material-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-						rho[(i+sizex*j)*Nmats+mat], rho_mat[ncells*mat + i+sizex*j], i, j, mat);
+						rho_mat_ave[(i+sizex*j)*Nmats+mat], rho_mat_ave_mat[ncells*mat + i+sizex*j], i, j, mat);
 					return false;
 				}
 			}

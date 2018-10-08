@@ -38,23 +38,25 @@
 #include <algorithm>
 
 extern void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *p, double *Vf, double *t,
+	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
 	double *V, double *x, double *y,
 	double *n, double *rho_ave);
 
 extern void full_matrix_material_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *p, double *Vf, double *t,
+	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
 	double *V, double *x, double *y,
 	double *n, double *rho_ave);
 
 extern bool full_matrix_check_results(int sizex, int sizey, int Nmats,
 	double *rho_ave, double *rho_ave_mat, double *p, double *p_mat,
-	double *rho, double *rho_mat);
+	double *rho, double *rho_mat, double *rho_mat_ave, double *rho_mat_ave_mat);
 
 extern void compact_cell_centric(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *x, double *y, double *n,
-	double *rho_compact, double *rho_compact_list, double *rho_ave_compact,
+	double *rho_compact, double *rho_compact_list, 
+  double *rho_mat_ave_compact, double *rho_mat_ave_compact_list,
+  double *rho_ave_compact,
 	double *p_compact, double *p_compact_list,
 	double *t_compact, double *t_compact_list,
 	double *V, double *Vf_compact_list, int mm_len,
@@ -64,7 +66,8 @@ extern bool compact_check_results(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *rho_ave, double *rho_ave_compact,
 	double *p, double *p_compact, double *p_compact_list,
-	double *rho, double *rho_compact, double *rho_compact_list, int *mmc_index);
+	double *rho, double *rho_compact, double *rho_compact_list, 
+  double *rho_mat_ave, double *rho_mat_ave_compact, double *rho_mat_ave_compact_list, int *mmc_index);
 
 void initialise_field_rand(double *rho, double *t, double *p, int Nmats, int sizex, int sizey, double prob2, double prob3, double prob4) {
 
@@ -239,12 +242,15 @@ int main(int argc, char* argv[]) {
     sizey = atoi(argv[2]);
 	int ncells = sizex*sizey;
 
-	int Nmats = 50;
+	int Nmats = 40;
 
 	//Allocate the four state variables for all Nmats materials and all cells 
 	//density
 	double *rho =  (double*)malloc(Nmats*ncells*sizeof(double));
 	memset(rho, 0, Nmats*ncells*sizeof(double));
+  //average density in neighbourhood
+	double *rho_mat_ave =  (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(rho_mat_ave, 0, Nmats*ncells*sizeof(double));
 	//pressure
 	double *p = (double*)malloc(Nmats*ncells*sizeof(double));
 	memset(p, 0, Nmats*ncells*sizeof(double));
@@ -258,6 +264,10 @@ int main(int argc, char* argv[]) {
 	// Buffers for material-centric representation
 	//density
 	double *rho_mat =  (double*)malloc(Nmats*ncells*sizeof(double));
+	//average density in neighbouring cells
+	double *rho_mat_ave_mat =  (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(rho_mat_ave_mat, 0, Nmats*ncells*sizeof(double));
+
 	//pressure
 	double *p_mat = (double*)malloc(Nmats*ncells*sizeof(double));
 	//Fractional volume
@@ -280,6 +290,8 @@ int main(int argc, char* argv[]) {
 
 	// Cell-centric compact storage
 	double *rho_compact = (double*)malloc(ncells*sizeof(double));
+	double *rho_mat_ave_compact = (double*)malloc(ncells*sizeof(double));
+	memset(rho_mat_ave_compact, 0, ncells*sizeof(double));
 	double *p_compact = (double*)malloc(ncells*sizeof(double));
 	double *t_compact = (double*)malloc(ncells*sizeof(double));
 
@@ -305,6 +317,8 @@ int main(int argc, char* argv[]) {
 
 	double *Vf_compact_list = (double*)malloc(list_size*sizeof(double));
 	double *rho_compact_list = (double*)malloc(list_size*sizeof(double));
+	double *rho_mat_ave_compact_list = (double*)malloc(list_size*sizeof(double));
+	memset(rho_mat_ave_compact_list, 0, list_size*sizeof(double));
 	double *t_compact_list = (double*)malloc(list_size*sizeof(double));
 	double *p_compact_list = (double*)malloc(list_size*sizeof(double));
 
@@ -452,27 +466,28 @@ int main(int argc, char* argv[]) {
 	}
 	mmc_index[mmc_cells] = imaterial_multi_cell;
 
-	full_matrix_cell_centric(sizex, sizey, Nmats, rho, p, Vf, t, V, x, y, n, rho_ave);
-	full_matrix_material_centric(sizex, sizey, Nmats, rho_mat, p_mat, Vf_mat, t_mat, V, x, y, n, rho_ave_mat);
+	full_matrix_cell_centric(sizex, sizey, Nmats, rho, rho_mat_ave, p, Vf, t, V, x, y, n, rho_ave);
+	full_matrix_material_centric(sizex, sizey, Nmats, rho_mat, rho_mat_ave_mat, p_mat, Vf_mat, t_mat, V, x, y, n, rho_ave_mat);
 	// Check results
-	if (!full_matrix_check_results(sizex, sizey, Nmats, rho_ave, rho_ave_mat, p, p_mat, rho, rho_mat)) {
+	if (!full_matrix_check_results(sizex, sizey, Nmats, rho_ave, rho_ave_mat, p, p_mat, rho, rho_mat, rho_mat_ave, rho_mat_ave_mat )) {
 		goto end;
 	}
 
 
 	compact_cell_centric(sizex, sizey, Nmats, imaterial, matids, nextfrac, x, y, n,
-		rho_compact, rho_compact_list, rho_ave_compact, p_compact, p_compact_list,
+		rho_compact, rho_compact_list, rho_mat_ave_compact, rho_mat_ave_compact_list, rho_ave_compact, p_compact, p_compact_list,
 		t_compact, t_compact_list, V, Vf_compact_list, imaterial_multi_cell,
 		mmc_cells, mmc_index, mmc_i, mmc_j);
 	// Check results
 	if (!compact_check_results(sizex, sizey, Nmats, imaterial, matids, nextfrac,
-			rho_ave, rho_ave_compact, p, p_compact, p_compact_list, rho, rho_compact, rho_compact_list, mmc_index))
+			rho_ave, rho_ave_compact, p, p_compact, p_compact_list, rho, rho_compact, rho_compact_list, rho_mat_ave, rho_mat_ave_compact, rho_mat_ave_compact_list, mmc_index))
 	{
 		goto end;
 	}
 
 end:
 	free(rho_mat); free(p_mat); free(Vf_mat); free(t_mat);
+  free(rho_mat_ave); free(rho_mat_ave_mat); free(rho_mat_ave_compact); free(rho_mat_ave_compact_list);
 	free(rho); free(p); free(Vf); free(t);
 	free(V); free(x); free(y);
 	free(n);

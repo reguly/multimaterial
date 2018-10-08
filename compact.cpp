@@ -5,13 +5,15 @@
 void compact_cell_centric(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *x, double *y, double *n,
-	double *rho_compact, double *rho_compact_list, double *rho_ave_compact,
+	double *rho_compact, double *rho_compact_list, 
+	double *rho_mat_ave_compact, double *rho_mat_ave_compact_list, 
+  double *rho_ave_compact,
 	double *p_compact, double *p_compact_list,
 	double *t_compact, double *t_compact_list,
 	double *V, double *Vf_compact_list, int mm_len, int mmc_cells, int *mmc_index, int *mmc_i, int *mmc_j)
 {
   #if defined(ACC)
-  #pragma acc data copy(imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells])
+  #pragma acc data copy(imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells],rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
   #endif
   { 
 	// Cell-centric algorithms
@@ -231,7 +233,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 						} // end for (int ni)
 					} // end for (int nj)
 
-					rho_compact_list[ix] = rho_sum / Nn;
+					rho_mat_ave_compact_list[ix] = rho_sum / Nn;
 				} // end for (ix = -ix)
 			} // end if (ix <= 0)
 			else {
@@ -288,7 +290,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 					} // end for (int ni)
 				} // end for (int nj)
 
-				rho_compact[i+sizex*j] = rho_sum / Nn;
+				rho_mat_ave_compact[i+sizex*j] = rho_sum / Nn;
 			} // end else
 		}
 	}
@@ -300,7 +302,7 @@ bool compact_check_results(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *rho_ave, double *rho_ave_compact,
 	double *p, double *p_compact, double *p_compact_list,
-	double *rho, double *rho_compact, double *rho_compact_list, int *mmc_index)
+	double *rho, double *rho_compact, double *rho_compact_list,  double *rho_mat_ave, double *rho_mat_ave_compact, double *rho_mat_ave_compact_list, int *mmc_index) 
 {
 	printf("Checking results of compact representation... ");
 
@@ -341,9 +343,9 @@ bool compact_check_results(int sizex, int sizey, int Nmats,
 					return false;
 				}
 
-				if (abs(rho[(i+sizex*j)*Nmats+mat] - rho_compact[i+sizex*j]) > 0.0001) {
+				if (abs(rho_mat_ave[(i+sizex*j)*Nmats+mat] - rho_mat_ave_compact[i+sizex*j]) > 0.0001) {
 					printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-						rho[(i+sizex*j)*Nmats+mat], rho_compact[i+sizex*j], i, j, mat);
+						rho_mat_ave[(i+sizex*j)*Nmats+mat], rho_mat_ave_compact[i+sizex*j], i, j, mat);
 					return false;
 				}
 			}
