@@ -26,10 +26,11 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
   #pragma acc loop independent
   #endif
 	for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(OMP)
+  #pragma omp simd
+  #elif defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
 		for (int i = 0; i < sizex; i++) {
 
 #ifdef FUSED
@@ -79,6 +80,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
+  
   #if defined(OMP)
   #pragma omp parallel for //collapse(2)
   #elif defined(ACC)
@@ -86,10 +88,11 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
   #pragma acc loop independent
   #endif
 	for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(OMP)
+  #pragma omp simd
+  #elif defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
 		for (int i = 0; i < sizex; i++) {
 			int ix = imaterial[i+sizex*j];
 
@@ -122,6 +125,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 			}
 		}
 	}
+printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells, mmc_index[mmc_cells]); 
 #ifndef FUSED
   #if defined(OMP)
   #pragma omp parallel for simd
@@ -146,10 +150,11 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
   #pragma acc loop independent
   #endif
 	for (int j = 1; j < sizey-1; j++) {
-  #if defined(ACC)
+  #if defined(OMP)
+  #pragma omp simd
+  #elif defined(ACC)
   #pragma acc loop independent
   #endif
-#pragma omp simd
 		for (int i = 1; i < sizex-1; i++) {
 			// o: outer
 			double xo = x[i+sizex*j];

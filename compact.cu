@@ -92,8 +92,11 @@ __global__ void ccc_loop2_2(const int * __restrict matids, const double * __rest
 }
 
 __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restrict nextfrac, const int * __restrict matids,
-							 double * __restrict rho_compact, 
-							 double * __restrict rho_compact_list, const double * __restrict x, const double * __restrict y,
+							 const double * __restrict rho_compact, 
+							 const double * __restrict rho_compact_list, 
+							 double * __restrict rho_mat_ave_compact, 
+							 double * __restrict rho_mat_ave_compact_list, 
+               const double * __restrict x, const double * __restrict y,
 						  int sizex, int sizey, int * __restrict mmc_index) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
 	int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -177,7 +180,7 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 				} // end for (int ni)
 			} // end for (int nj)
 
-			rho_compact_list[ix] = rho_sum / Nn;
+			rho_mat_ave_compact_list[ix] = rho_sum / Nn;
 		} // end for (ix = -ix)
 	} // end if (ix <= 0)
 	else {
@@ -234,7 +237,7 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 			} // end for (int ni)
 		} // end for (int nj)
 
-		rho_compact[i+sizex*j] = rho_sum / Nn;
+		rho_mat_ave_compact[i+sizex*j] = rho_sum / Nn;
 	} // end else
 
 }
@@ -242,7 +245,9 @@ __global__ void ccc_loop3(const int * __restrict imaterial, const int * __restri
 void compact_cell_centric(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *x, double *y, double *n,
-	double *rho_compact, double *rho_compact_list, double *rho_ave_compact,
+	double *rho_compact, double *rho_compact_list, 
+  double *rho_mat_ave_compact, double *rho_mat_ave_compact_list,
+  double *rho_ave_compact,
 	double *p_compact, double *p_compact_list,
 	double *t_compact, double *t_compact_list,
 	double *V, double *Vf_compact_list, int mm_len, int mmc_cells, int *mmc_index, int *mmc_i, int *mmc_j)
@@ -258,6 +263,8 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 	double *d_y = (double *)cp_to_device((char*)y, sizex*sizey*sizeof(double));
 	double *d_rho_compact = (double *)cp_to_device((char*)rho_compact, sizex*sizey*sizeof(double));
 	double *d_rho_compact_list = (double *)cp_to_device((char*)rho_compact_list,mm_len*sizeof(double));
+	double *d_rho_mat_ave_compact = (double *)cp_to_device((char*)rho_mat_ave_compact, sizex*sizey*sizeof(double));
+	double *d_rho_mat_ave_compact_list = (double *)cp_to_device((char*)rho_mat_ave_compact_list,mm_len*sizeof(double));
 	double *d_p_compact = (double *)cp_to_device((char*)p_compact, sizex*sizey*sizeof(double));
 	double *d_p_compact_list = (double *)cp_to_device((char*)p_compact_list,mm_len*sizeof(double));
 	double *d_t_compact = (double *)cp_to_device((char*)t_compact, sizex*sizey*sizeof(double));
@@ -293,7 +300,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
-	ccc_loop3<<<blocks, threads>>>(d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
+	ccc_loop3<<<blocks, threads>>>(d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_rho_mat_ave_compact, d_rho_mat_ave_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
   cudaDeviceSynchronize();
  	printf("Compact matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
   
@@ -301,6 +308,8 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 	cp_to_host((char*)y, (char*)d_y, sizex*sizey*sizeof(double));
 	cp_to_host((char*)rho_compact, (char*)d_rho_compact, sizex*sizey*sizeof(double));
 	cp_to_host((char*)rho_compact_list, (char*)d_rho_compact_list, mm_len*sizeof(double));
+	cp_to_host((char*)rho_mat_ave_compact, (char*)d_rho_mat_ave_compact, sizex*sizey*sizeof(double));
+	cp_to_host((char*)rho_mat_ave_compact_list, (char*)d_rho_mat_ave_compact_list, mm_len*sizeof(double));
 	cp_to_host((char*)p_compact, (char*)d_p_compact, sizex*sizey*sizeof(double));
 	cp_to_host((char*)p_compact_list, (char*)d_p_compact_list, mm_len*sizeof(double));
 	cp_to_host((char*)t_compact, (char*)d_t_compact, sizex*sizey*sizeof(double));
@@ -315,7 +324,8 @@ bool compact_check_results(int sizex, int sizey, int Nmats,
 	int *imaterial, int *matids, int *nextfrac,
 	double *rho_ave, double *rho_ave_compact,
 	double *p, double *p_compact, double *p_compact_list,
-	double *rho, double *rho_compact, double *rho_compact_list, int *mmc_index)
+	double *rho, double *rho_compact, double *rho_compact_list, 
+  double *rho_mat_ave, double *rho_mat_ave_compact, double *rho_mat_ave_compact_list, int *mmc_index)
 {
 	printf("Checking results of compact representation... ");
 
@@ -340,9 +350,9 @@ bool compact_check_results(int sizex, int sizey, int Nmats,
 						return false;
 					}
 
-					if (abs(rho[(i+sizex*j)*Nmats+mat] - rho_compact_list[ix]) > 0.0001) {
+					if (abs(rho_mat_ave[(i+sizex*j)*Nmats+mat] - rho_mat_ave_compact_list[ix]) > 0.0001) {
 						printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-							rho[(i+sizex*j)*Nmats+mat], rho_compact_list[ix], i, j, mat);
+							rho_mat_ave[(i+sizex*j)*Nmats+mat], rho_mat_ave_compact_list[ix], i, j, mat);
 						return false;
 					}
 				}
@@ -356,9 +366,9 @@ bool compact_check_results(int sizex, int sizey, int Nmats,
 					return false;
 				}
 
-				if (abs(rho[(i+sizex*j)*Nmats+mat] - rho_compact[i+sizex*j]) > 0.0001) {
+				if (abs(rho_mat_ave[(i+sizex*j)*Nmats+mat] - rho_mat_ave_compact[i+sizex*j]) > 0.0001) {
 					printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-						rho[(i+sizex*j)*Nmats+mat], rho_compact[i+sizex*j], i, j, mat);
+						rho_mat_ave[(i+sizex*j)*Nmats+mat], rho_mat_ave_compact[i+sizex*j], i, j, mat);
 					return false;
 				}
       }
