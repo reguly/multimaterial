@@ -37,202 +37,235 @@
 #include <string.h>
 #include <algorithm>
 
-extern void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
-	double *V, double *x, double *y,
-	double *n, double *rho_ave);
+struct full_data
+{
+	int sizex;
+	int sizey;
+	int Nmats;
+	double * __restrict__ rho;
+	double * __restrict__ rho_mat_ave;
+	double * __restrict__ p;
+	double * __restrict__ Vf;
+	double * __restrict__ t;
+	double * __restrict__ V;
+	double * __restrict__ x;
+	double * __restrict__ y;
+	double * __restrict__ n;
+	double * __restrict__ rho_ave;
+};
 
-extern void full_matrix_material_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
-	double *V, double *x, double *y,
-	double *n, double *rho_ave);
+struct compact_data
+{
+	int sizex;
+	int sizey;
+	int Nmats;
+	double * __restrict__ rho_compact;
+	double * __restrict__ rho_compact_list;
+	double * __restrict__ rho_mat_ave_compact;
+	double * __restrict__ rho_mat_ave_compact_list;
+	double * __restrict__ p_compact;
+	double * __restrict__ p_compact_list;
+	double * __restrict__ Vf_compact_list;
+	double * __restrict__ t_compact;
+	double * __restrict__ t_compact_list;
+	double * __restrict__ V;
+	double * __restrict__ x;
+	double * __restrict__ y;
+	double * __restrict__ n;
+	double * __restrict__ rho_ave_compact;
+	int * __restrict__ imaterial;
+	int * __restrict__ matids;
+	int * __restrict__ nextfrac;
+	int * __restrict__ mmc_index;
+	int * __restrict__ mmc_i;
+	int * __restrict__ mmc_j;
+	int mm_len;
+	int mmc_cells;
+};
 
-extern bool full_matrix_check_results(int sizex, int sizey, int Nmats,
-	double *rho_ave, double *rho_ave_mat, double *p, double *p_mat,
-	double *rho, double *rho_mat, double *rho_mat_ave, double *rho_mat_ave_mat);
 
-extern void compact_cell_centric(int sizex, int sizey, int Nmats,
-	int *imaterial, int *matids, int *nextfrac,
-	double *x, double *y, double *n,
-	double *rho_compact, double *rho_compact_list, 
-  double *rho_mat_ave_compact, double *rho_mat_ave_compact_list,
-  double *rho_ave_compact,
-	double *p_compact, double *p_compact_list,
-	double *t_compact, double *t_compact_list,
-	double *V, double *Vf_compact_list, int mm_len,
-	int mmc_cells, int *mmc_index, int *mmc_i, int *mmc_j);
+extern void full_matrix_cell_centric(full_data cc);
 
-extern bool compact_check_results(int sizex, int sizey, int Nmats,
-	int *imaterial, int *matids, int *nextfrac,
-	double *rho_ave, double *rho_ave_compact,
-	double *p, double *p_compact, double *p_compact_list,
-	double *rho, double *rho_compact, double *rho_compact_list, 
-  double *rho_mat_ave, double *rho_mat_ave_compact, double *rho_mat_ave_compact_list, int *mmc_index);
+extern void full_matrix_material_centric(full_data cc, full_data mc);
 
-void initialise_field_rand(double *rho, double *t, double *p, int Nmats, int sizex, int sizey, double prob2, double prob3, double prob4) {
+extern bool full_matrix_check_results(full_data cc, full_data mc);
 
+extern void compact_cell_centric(full_data cc, compact_data ccc);
+
+extern bool compact_check_results(full_data cc, compact_data ccc);
+
+void initialise_field_rand(full_data cc, double prob2, double prob3, double prob4) {
+
+	int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
   //let's use a morton space filling curve here
   srand(0);
   double prob1 = 1.0-prob2-prob3-prob4;
   printf("Random layout %g %g %g %g\n", prob1, prob2, prob3, prob4);
 
-  for (int n = 0; n < sizex*sizey; n++) {
-    int i = n%sizex;//n & 0xAAAA;
-    int j = n/sizex;//n & 0x5555;
+  for (int n = 0; n < cc.sizex*sizey; n++) {
+    int i = n%cc.sizex;//n & 0xAAAA;
+    int j = n/cc.sizex;//n & 0x5555;
 
     double r = (double)rand()/(double)RAND_MAX;
-    int m = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+    int m = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
     int m2, m3, m4;
-    rho[(i+sizex*j)*Nmats+m] = 1.0;
-    t[(i+sizex*j)*Nmats+m] = 1.0;
-    p[(i+sizex*j)*Nmats+m] = 1.0;
+    cc.rho[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
+    cc.t[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
+    cc.p[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
     if (r >= prob1) {
-      m2 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
       while (m2 == m)
-        m2 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
-      rho[(i+sizex*j)*Nmats+m2] = 1.0;
-      t[(i+sizex*j)*Nmats+m2] = 1.0;
-      p[(i+sizex*j)*Nmats+m2] = 1.0;
+        m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+      cc.rho[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
+      cc.t[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
+      cc.p[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
     }
     if (r >= 1.0-prob4-prob3) {
-      m3 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
       while (m3 == m && m3 == m2)
-        m3 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
-      rho[(i+sizex*j)*Nmats+m3] = 1.0;
-      t[(i+sizex*j)*Nmats+m3] = 1.0;
-      p[(i+sizex*j)*Nmats+m3] = 1.0;
+        m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+      cc.rho[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
+      cc.t[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
+      cc.p[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
     }
     if (r >= 1.0-prob4) {
-      m4 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
+      m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
       while (m4 == m && m4 == m2 && m4 == m3)
-        m4 = (double)rand()/(double)RAND_MAX * Nmats/4 + (Nmats/4)*(i/(sizex*sizey/4));
-      rho[(i+sizex*j)*Nmats+m4] = 1.0;
-      t[(i+sizex*j)*Nmats+m4] = 1.0;
-      p[(i+sizex*j)*Nmats+m4] = 1.0;
+        m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+      cc.rho[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
+      cc.t[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
+      cc.p[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
     }
   }
 }
 
-  void initialise_field_static(double *rho, double *t, double *p, int Nmats, int sizex, int sizey) {
+  void initialise_field_static(full_data cc) {
 	//Pure cells and simple overlaps
+		int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
 	int width = sizex/Nmats;
 
   int overlap_i = std::max(0.0,ceil((double)sizey/1000.0)-1);
   int overlap_j = std::max(0.0,floor((double)sizex/1000.0)-1);
 
 	//Top
-	for (int mat = 0; mat < Nmats/2; mat++) {
+	for (int mat = 0; mat < cc.Nmats/2; mat++) {
 #pragma omp parallel for
 		for (int j = mat*width; j < sizey/2+overlap_j; j++) {
 			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < (mat+1)*width; i++) { //+1 for overlap
-				rho[(i+sizex*j)*Nmats+mat] = 1.0;
-				t[(i+sizex*j)*Nmats+mat] = 1.0;
-				p[(i+sizex*j)*Nmats+mat] = 1.0;
+				cc.rho[(i+sizex*j)*cc.Nmats+mat] = 1.0;
+				cc.t[(i+sizex*j)*cc.Nmats+mat] = 1.0;
+				cc.p[(i+sizex*j)*cc.Nmats+mat] = 1.0;
 			}
 			for (int i = sizex-mat*width-1+(mat>0)*overlap_i; i >= sizex-(mat+1)*width-1; i--) { //+1 for overlap
-				rho[(i+sizex*j)*Nmats+mat] = 1.0;
-				t[(i+sizex*j)*Nmats+mat] = 1.0;
-				p[(i+sizex*j)*Nmats+mat] = 1.0;
+				cc.rho[(i+sizex*j)*cc.Nmats+mat] = 1.0;
+				cc.t[(i+sizex*j)*cc.Nmats+mat] = 1.0;
+				cc.p[(i+sizex*j)*cc.Nmats+mat] = 1.0;
 			}
 		}
 
 #pragma omp parallel for
 		for (int j = mat*width-(mat>0)-(mat>0)*overlap_j; j < (mat+1)*width; j++) { //+1 for overlap
 			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < sizex-mat*width; i++) {
-				rho[(i+sizex*j)*Nmats+mat] = 1.0;
-				t[(i+sizex*j)*Nmats+mat] = 1.0;
-				p[(i+sizex*j)*Nmats+mat] = 1.0;
+				cc.rho[(i+sizex*j)*cc.Nmats+mat] = 1.0;
+				cc.t[(i+sizex*j)*cc.Nmats+mat] = 1.0;
+				cc.p[(i+sizex*j)*cc.Nmats+mat] = 1.0;
 			}
 		}
 	}
 	
 	//Bottom
-	for (int mat = 0; mat < Nmats/2; mat++) {
+	for (int mat = 0; mat < cc.Nmats/2; mat++) {
 #pragma omp parallel for
 		for (int j = sizey/2-1-overlap_j; j < sizey-mat*width; j++) {
 			for (int i = mat*width-(mat>0)-(mat>0)*overlap_i; i < (mat+1)*width; i++) { //+1 for overlap
-				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
-				t[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
-				p[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
+				cc.rho[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
+				cc.t[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
+				cc.p[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
 			}
 			for (int i = sizex-mat*width-1+(mat>0)*overlap_i; i >= sizex-(mat+1)*width-1; i--) { //+1 for overlap
-				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
-				t[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
-				p[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
+				cc.rho[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
+				cc.t[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
+				cc.p[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
 			}
 		}
 #pragma omp parallel for
-		for (int j = sizey-mat*width-1+(mat>0)*overlap_j; j >= sizey-(mat+1)*width-(mat<(Nmats/2-1)); j--) { //+1 for overlap
+		for (int j = sizey-mat*width-1+(mat>0)*overlap_j; j >= sizey-(mat+1)*width-(mat<(cc.Nmats/2-1)); j--) { //+1 for overlap
 			for (int i = mat*width; i < sizex-mat*width; i++) {
-				rho[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
-				t[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
-				p[(i+sizex*j)*Nmats+mat+Nmats/2] = 1.0;
+				cc.rho[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
+				cc.t[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
+				cc.p[(i+sizex*j)*cc.Nmats+mat+cc.Nmats/2] = 1.0;
 			}
 		}
 	}
 	//Fill in corners
 #pragma omp parallel for
-	for (int mat = 1; mat < Nmats/2; mat++) {
+	for (int mat = 1; mat < cc.Nmats/2; mat++) {
 		for (int j = sizey/2-3; j < sizey/2-1;j++)
 			for (int i = 2; i < 5+overlap_i; i++) {
 				//x neighbour material
-				rho[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;
 				//y neighbour material
-				rho[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;
 				//x-y neighbour material
-				rho[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;t[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;
 			}
 		for (int j = sizey/2; j < sizey/2+2+overlap_j;j++)
 			for (int i = 2; i < 5; i++) {
 				//x neighbour material
-				rho[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+Nmats/2+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+Nmats/2+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats+cc.Nmats/2+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats+cc.Nmats/2+mat] = 1.0;
 				//y neighbour material
-				rho[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;
 
 			}
 	}
 	int only_8 = 0;
-	for (int mat = Nmats/2+1; mat < Nmats; mat++) {
+	for (int mat = cc.Nmats/2+1; mat < cc.Nmats; mat++) {
 		for (int j = sizey/2-3; j < sizey/2-1;j++)
 			for (int i = 2; i < 5; i++) {
 				//x neighbour material
-				rho[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;
 				//y neighbour material
-				rho[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;
 			}
 		for (int j = sizey/2; j < sizey/2+2;j++)
 			for (int i = 2; i < 4; i++) {
 				if (i < 3 && only_8<6) {
 					//y neighbour material
-					rho[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;
-					rho[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;
+					cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;
+					cc.rho[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;
 				}
 				if (i==2 && only_8==0) {
 					//x-y neighbour material
-					rho[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;
-					rho[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat-1] = 1.0;t[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats-Nmats/2+mat] = 1.0;
+					cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;
+					cc.rho[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 1.0;
 				}
 				//x neighbour material
-				if (mat >= Nmats-8 && j==sizey/2+1 && i==3) if (only_8++>=4) {
+				if (mat >= cc.Nmats-8 && j==sizey/2+1 && i==3) if (only_8++>=4) {
 					break;
 				}
-				rho[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;t[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;p[(mat*width+i-2+sizex*j)*Nmats+mat-1] = 1.0;
-				rho[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;t[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;p[(mat*width-i+sizex*j)*Nmats+mat] = 1.0;
+				cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats+mat-1] = 1.0;
+				cc.rho[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.t[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;cc.p[(mat*width-i+sizex*j)*cc.Nmats+mat] = 1.0;
 			}
 	}
 #pragma omp parallel for
-	for (int mat=Nmats/2+1; mat < Nmats/2+5; mat++) {
+	for (int mat=cc.Nmats/2+1; mat < cc.Nmats/2+5; mat++) {
 		int i = 2; int j = sizey/2+1;
-		rho[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat] = 0.0;t[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;p[(mat*width+i-2+sizex*j)*Nmats-Nmats/2+mat-1] = 0.0;
+		cc.rho[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat] = 0.0;cc.t[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 0.0;cc.p[(mat*width+i-2+sizex*j)*cc.Nmats-cc.Nmats/2+mat-1] = 0.0;
 	}
 }
+
+
 int main(int argc, char* argv[]) {
 	int sizex = 1000;
   if (argc > 1)
@@ -244,59 +277,73 @@ int main(int argc, char* argv[]) {
 
 	int Nmats = 40;
 
+	full_data cc;
+	full_data mc;
+	compact_data ccc;
+
+	cc.sizex = sizex;
+	mc.sizex = sizex;
+	ccc.sizex = sizex;
+	cc.sizey = sizey;
+	mc.sizey = sizey;
+	ccc.sizey = sizey;
+	cc.Nmats = Nmats;
+	mc.Nmats = Nmats;
+	ccc.Nmats = Nmats;
+
 	//Allocate the four state variables for all Nmats materials and all cells 
 	//density
-	double *rho =  (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(rho, 0, Nmats*ncells*sizeof(double));
+	cc.rho =  (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(cc.rho, 0, Nmats*ncells*sizeof(double));
   //average density in neighbourhood
-	double *rho_mat_ave =  (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(rho_mat_ave, 0, Nmats*ncells*sizeof(double));
+	cc.rho_mat_ave =  (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(cc.rho_mat_ave, 0, Nmats*ncells*sizeof(double));
 	//pressure
-	double *p = (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(p, 0, Nmats*ncells*sizeof(double));
+	cc.p = (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(cc.p, 0, Nmats*ncells*sizeof(double));
 	//Fractional volume
-	double *Vf = (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(Vf, 0, Nmats*ncells*sizeof(double));
+	cc.Vf = (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(cc.Vf, 0, Nmats*ncells*sizeof(double));
 	//temperature
-	double *t = (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(t, 0, Nmats*ncells*sizeof(double));
+	cc.t = (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(cc.t, 0, Nmats*ncells*sizeof(double));
 
 	// Buffers for material-centric representation
 	//density
-	double *rho_mat =  (double*)malloc(Nmats*ncells*sizeof(double));
+	mc.rho =  (double*)malloc(Nmats*ncells*sizeof(double));
 	//average density in neighbouring cells
-	double *rho_mat_ave_mat =  (double*)malloc(Nmats*ncells*sizeof(double));
-	memset(rho_mat_ave_mat, 0, Nmats*ncells*sizeof(double));
+	mc.rho_mat_ave =  (double*)malloc(Nmats*ncells*sizeof(double));
+	memset(mc.rho_mat_ave, 0, Nmats*ncells*sizeof(double));
 
 	//pressure
-	double *p_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+	mc.p = (double*)malloc(Nmats*ncells*sizeof(double));
 	//Fractional volume
-	double *Vf_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+	mc.Vf = (double*)malloc(Nmats*ncells*sizeof(double));
 	//temperature
-	double *t_mat = (double*)malloc(Nmats*ncells*sizeof(double));
+	mc.t = (double*)malloc(Nmats*ncells*sizeof(double));
 
 	//Allocate per-cell only datasets
-	double *V = (double*)malloc(ncells*sizeof(double));
-	double *x = (double*)malloc(ncells*sizeof(double));
-	double *y = (double*)malloc(ncells*sizeof(double));
+	cc.V = (double*)malloc(ncells*sizeof(double));
+	cc.x = (double*)malloc(ncells*sizeof(double));
+	cc.y = (double*)malloc(ncells*sizeof(double));
 
 	//Allocate per-material only datasets
-	double *n = (double*)malloc(Nmats*sizeof(double)); // number of moles
+	cc.n = (double*)malloc(Nmats*sizeof(double)); // number of moles
 
 	//Allocate output datasets
-	double *rho_ave = (double*)malloc(ncells*sizeof(double));
-	double *rho_ave_mat = (double*)malloc(ncells*sizeof(double));
-	double *rho_ave_compact = (double*)malloc(ncells*sizeof(double));
+	cc.rho_ave = (double*)malloc(ncells*sizeof(double));
+	mc.rho_ave = (double*)malloc(ncells*sizeof(double));
+	ccc.rho_ave_compact = (double*)malloc(ncells*sizeof(double));
 
 	// Cell-centric compact storage
-	double *rho_compact = (double*)malloc(ncells*sizeof(double));
-	double *rho_mat_ave_compact = (double*)malloc(ncells*sizeof(double));
-	memset(rho_mat_ave_compact, 0, ncells*sizeof(double));
-	double *p_compact = (double*)malloc(ncells*sizeof(double));
-	double *t_compact = (double*)malloc(ncells*sizeof(double));
+	ccc.rho_compact = (double*)malloc(ncells*sizeof(double));
+	ccc.rho_mat_ave_compact = (double*)malloc(ncells*sizeof(double));
+	memset(ccc.rho_mat_ave_compact, 0, ncells*sizeof(double));
+	ccc.p_compact = (double*)malloc(ncells*sizeof(double));
+	ccc.t_compact = (double*)malloc(ncells*sizeof(double));
 
 	int *nmats = (int*)malloc(ncells*sizeof(int));
-	int *imaterial = (int*)malloc(ncells*sizeof(int));
+	ccc.imaterial = (int*)malloc(ncells*sizeof(int));
 
 	// List
     double mul = ceil((double)sizex/1000.0) * ceil((double)sizey/1000.0);
@@ -306,24 +353,24 @@ int main(int argc, char* argv[]) {
 
 
 	//plain linked list
-	int *nextfrac = (int*)malloc(list_size*sizeof(int));
+	ccc.nextfrac = (int*)malloc(list_size*sizeof(int));
 	int *frac2cell = (int*)malloc(list_size*sizeof(int));
-	int *matids = (int*)malloc(list_size*sizeof(int));
+	ccc.matids = (int*)malloc(list_size*sizeof(int));
 
 	//CSR list
-	int mmc_cells;
-	int *mmc_index = (int *)malloc(list_size*sizeof(int)); //CSR mapping for mix cell idx -> compact list position
-	int *mmc_i = (int *)malloc(list_size*sizeof(int)); // mixed cell -> physical cell i coord
-	int *mmc_j = (int *)malloc(list_size*sizeof(int)); //  mixed cell -> physical cell j coord
+	ccc.mmc_index = (int *)malloc(list_size*sizeof(int)); //CSR mapping for mix cell idx -> compact list position
+	ccc.mmc_i = (int *)malloc(list_size*sizeof(int)); // mixed cell -> physical cell i coord
+	ccc.mmc_j = (int *)malloc(list_size*sizeof(int)); //  mixed cell -> physical cell j coord
 	
 
 
-	double *Vf_compact_list = (double*)malloc(list_size*sizeof(double));
-	double *rho_compact_list = (double*)malloc(list_size*sizeof(double));
-	double *rho_mat_ave_compact_list = (double*)malloc(list_size*sizeof(double));
-	memset(rho_mat_ave_compact_list, 0, list_size*sizeof(double));
-	double *t_compact_list = (double*)malloc(list_size*sizeof(double));
-	double *p_compact_list = (double*)malloc(list_size*sizeof(double));
+	ccc.mmc_cells = 0;
+	ccc.Vf_compact_list = (double*)malloc(list_size*sizeof(double));
+	ccc.rho_compact_list = (double*)malloc(list_size*sizeof(double));
+	ccc.rho_mat_ave_compact_list = (double*)malloc(list_size*sizeof(double));
+	memset(ccc.rho_mat_ave_compact_list, 0, list_size*sizeof(double));
+	ccc.t_compact_list = (double*)malloc(list_size*sizeof(double));
+	ccc.p_compact_list = (double*)malloc(list_size*sizeof(double));
 
 	int imaterial_multi_cell;
 
@@ -332,18 +379,24 @@ int main(int argc, char* argv[]) {
 	double dy = 1.0/sizey;
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
-			V[i+j*sizex] = dx*dy;
-			x[i+j*sizex] = dx*i;
-			y[i+j*sizex] = dy*j;
+			cc.V[i+j*sizex] = dx*dy;
+			cc.x[i+j*sizex] = dx*i;
+			cc.y[i+j*sizex] = dy*j;
 		}
 	}
 
 	for (int mat = 0; mat < Nmats; mat++) {
-		n[mat] = 1.0; // dummy value
+		cc.n[mat] = 1.0; // dummy value
 	}
 
-  if (argc>=6) initialise_field_rand(rho, t, p, Nmats, sizex, sizey, atof(argv[3]), atof(argv[4]), atof(argv[5]));
-  else initialise_field_static(rho, t, p, Nmats, sizex, sizey);
+  //These are the same throughout
+  ccc.V = mc.V = cc.V;
+  ccc.x = mc.x = cc.x;
+  ccc.y = mc.y = cc.y;
+  ccc.n = mc.n = cc.n;
+  
+  if (argc>=6) initialise_field_rand(cc, atof(argv[3]), atof(argv[4]), atof(argv[5]));
+  else initialise_field_static(cc);
 
 	FILE *f;
 	int print_to_file = 0;
@@ -353,12 +406,12 @@ int main(int argc, char* argv[]) {
 
 	//Compute fractions and count cells
 	int cell_counts_by_mat[4] = {0,0,0,0};
-	mmc_cells = 0;
+	ccc.mmc_cells = 0;
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			int count = 0;
 			for (int mat = 0; mat < Nmats; mat++) {
-				count += rho[(i+sizex*j)*Nmats+mat]!=0.0;
+				count += cc.rho[(i+sizex*j)*Nmats+mat]!=0.0;
 			}
 			if (count == 0) {
 				printf("Error: no materials in cell %d %d\n",i,j);
@@ -367,7 +420,7 @@ int main(int argc, char* argv[]) {
 
 				goto end;
 			}
-			if (count > 1) mmc_cells++;
+			if (count > 1) ccc.mmc_cells++;
 
 			cell_counts_by_mat[count-1]++;
 
@@ -377,14 +430,14 @@ int main(int argc, char* argv[]) {
 			}
 
 			for (int mat = 0; mat < Nmats; mat++) {
-				if (rho[(i+sizex*j)*Nmats+mat]!=0.0) Vf[(i+sizex*j)*Nmats+mat]=1.0/count;
+				if (cc.rho[(i+sizex*j)*Nmats+mat]!=0.0) cc.Vf[(i+sizex*j)*Nmats+mat]=1.0/count;
 			}
 		}
 		if (print_to_file)
 			fprintf(f,"\n");
 	}
 	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d: MMC cells %d\n",
-		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3], mmc_cells);
+		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3], ccc.mmc_cells);
 
 	if (print_to_file)
 		fclose(f);
@@ -394,17 +447,17 @@ int main(int argc, char* argv[]) {
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			for (int mat = 0; mat < Nmats; mat++) {
-				rho_mat[ncells*mat + i+sizex*j] = rho[(i+sizex*j)*Nmats+mat];
-				p_mat[ncells*mat + i+sizex*j] = p[(i+sizex*j)*Nmats+mat];
-				Vf_mat[ncells*mat + i+sizex*j] = Vf[(i+sizex*j)*Nmats+mat];
-				t_mat[ncells*mat + i+sizex*j] = t[(i+sizex*j)*Nmats+mat];
+				mc.rho[ncells*mat + i+sizex*j] = cc.rho[(i+sizex*j)*Nmats+mat];
+				mc.p[ncells*mat + i+sizex*j] = cc.p[(i+sizex*j)*Nmats+mat];
+				mc.Vf[ncells*mat + i+sizex*j] = cc.Vf[(i+sizex*j)*Nmats+mat];
+				mc.t[ncells*mat + i+sizex*j] = cc.t[(i+sizex*j)*Nmats+mat];
 			}
 		}
 	}
 
 	// Copy data from cell-centric full matrix storage to cell-centric compact storage
 	imaterial_multi_cell = 0;
-	mmc_cells = 0;
+	ccc.mmc_cells = 0;
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
 			int mat_indices[4] = { -1, -1, -1, -1 };
@@ -412,7 +465,7 @@ int main(int argc, char* argv[]) {
 			int count = 0;
 
 			for (int mat = 0; mat < Nmats; mat++) {
-				if (rho[(i+sizex*j)*Nmats+mat]!=0.0) {
+				if (cc.rho[(i+sizex*j)*Nmats+mat]!=0.0) {
 					mat_indices[matindex++] = mat;
 					count += 1;
 				}
@@ -425,81 +478,77 @@ int main(int argc, char* argv[]) {
 
 			if (count == 1) {
 				int mat = mat_indices[0];
-				rho_compact[i+sizex*j] = rho[(i+sizex*j)*Nmats+mat];
-				p_compact[i+sizex*j] = p[(i+sizex*j)*Nmats+mat];
-				t_compact[i+sizex*j] = t[(i+sizex*j)*Nmats+mat];
+				ccc.rho_compact[i+sizex*j] = cc.rho[(i+sizex*j)*Nmats+mat];
+				ccc.p_compact[i+sizex*j] = cc.p[(i+sizex*j)*Nmats+mat];
+				ccc.t_compact[i+sizex*j] = cc.t[(i+sizex*j)*Nmats+mat];
 				nmats[i+sizex*j] = -1;
 				// NOTE: HACK: we index materials from zero, but zero can be a list index
-				imaterial[i+sizex*j] = mat + 1;
+				ccc.imaterial[i+sizex*j] = mat + 1;
 			}
 			else { // count > 1
 				nmats[i+sizex*j] = count;
 				// note the minus sign, it needs to be negative
 #ifdef LINKED
-				imaterial[i+sizex*j] = -imaterial_multi_cell;
+				ccc.imaterial[i+sizex*j] = -imaterial_multi_cell;
 #else
-				imaterial[i+sizex*j] = -mmc_cells;
+				ccc.imaterial[i+sizex*j] = -ccc.mmc_cells;
 #endif
-				mmc_index[mmc_cells] = imaterial_multi_cell;
-				mmc_i[mmc_cells] = i;
-				mmc_j[mmc_cells] = j;
-				mmc_cells++;
+				ccc.mmc_index[ccc.mmc_cells] = imaterial_multi_cell;
+				ccc.mmc_i[ccc.mmc_cells] = i;
+				ccc.mmc_j[ccc.mmc_cells] = j;
+				ccc.mmc_cells++;
 
 				for (int list_idx = imaterial_multi_cell; list_idx < imaterial_multi_cell + count; ++list_idx) {
 					// if last iteration
 					if (list_idx == imaterial_multi_cell + count - 1)
-						nextfrac[list_idx] = -1;
+						ccc.nextfrac[list_idx] = -1;
 					else // not last
-						nextfrac[list_idx] = list_idx + 1;
+						ccc.nextfrac[list_idx] = list_idx + 1;
 
 					frac2cell[list_idx] = i+sizex*j;
 
 					int mat = mat_indices[list_idx - imaterial_multi_cell];
-					matids[list_idx] = mat;
+					ccc.matids[list_idx] = mat;
 
-					Vf_compact_list[list_idx] = Vf[(i+sizex*j)*Nmats+mat];
-					rho_compact_list[list_idx] = rho[(i+sizex*j)*Nmats+mat];
-					p_compact_list[list_idx] = p[(i+sizex*j)*Nmats+mat];
-					t_compact_list[list_idx] = t[(i+sizex*j)*Nmats+mat];
+					ccc.Vf_compact_list[list_idx] = cc.Vf[(i+sizex*j)*Nmats+mat];
+					ccc.rho_compact_list[list_idx] = cc.rho[(i+sizex*j)*Nmats+mat];
+					ccc.p_compact_list[list_idx] = cc.p[(i+sizex*j)*Nmats+mat];
+					ccc.t_compact_list[list_idx] = cc.t[(i+sizex*j)*Nmats+mat];
 				}
 
 				imaterial_multi_cell += count;
 			}
 		}
 	}
-	mmc_index[mmc_cells] = imaterial_multi_cell;
+	ccc.mmc_index[ccc.mmc_cells] = imaterial_multi_cell;
 
-	full_matrix_cell_centric(sizex, sizey, Nmats, rho, rho_mat_ave, p, Vf, t, V, x, y, n, rho_ave);
-	full_matrix_material_centric(sizex, sizey, Nmats, rho_mat, rho_mat_ave_mat, p_mat, Vf_mat, t_mat, V, x, y, n, rho_ave_mat);
+	full_matrix_cell_centric(cc);
+	full_matrix_material_centric(cc, mc);
 	// Check results
-	if (!full_matrix_check_results(sizex, sizey, Nmats, rho_ave, rho_ave_mat, p, p_mat, rho, rho_mat, rho_mat_ave, rho_mat_ave_mat )) {
+	if (!full_matrix_check_results(cc, mc)) {
 		goto end;
 	}
 
 
-	compact_cell_centric(sizex, sizey, Nmats, imaterial, matids, nextfrac, x, y, n,
-		rho_compact, rho_compact_list, rho_mat_ave_compact, rho_mat_ave_compact_list, rho_ave_compact, p_compact, p_compact_list,
-		t_compact, t_compact_list, V, Vf_compact_list, imaterial_multi_cell,
-		mmc_cells, mmc_index, mmc_i, mmc_j);
+	compact_cell_centric(cc, ccc);
 	// Check results
-	if (!compact_check_results(sizex, sizey, Nmats, imaterial, matids, nextfrac,
-			rho_ave, rho_ave_compact, p, p_compact, p_compact_list, rho, rho_compact, rho_compact_list, rho_mat_ave, rho_mat_ave_compact, rho_mat_ave_compact_list, mmc_index))
+	if (!compact_check_results(cc, ccc))
 	{
 		goto end;
 	}
 
 end:
-	free(rho_mat); free(p_mat); free(Vf_mat); free(t_mat);
-  free(rho_mat_ave); free(rho_mat_ave_mat); free(rho_mat_ave_compact); free(rho_mat_ave_compact_list);
-	free(rho); free(p); free(Vf); free(t);
-	free(V); free(x); free(y);
-	free(n);
-	free(rho_ave); free(rho_ave_mat); free(rho_ave_compact);
+	free(mc.rho); free(mc.p); free(mc.Vf); free(mc.t);
+  free(cc.rho_mat_ave); free(mc.rho_mat_ave); free(ccc.rho_mat_ave_compact); free(ccc.rho_mat_ave_compact_list);
+	free(cc.rho); free(cc.p); free(cc.Vf); free(cc.t);
+	free(cc.V); free(cc.x); free(cc.y);
+	free(cc.n);
+	free(cc.rho_ave); free(mc.rho_ave); free(ccc.rho_ave_compact);
 
-	free(rho_compact); free(p_compact); free(t_compact);
-	free(nmats); free(imaterial);
-	free(nextfrac); free(frac2cell); free(matids);
-	free(Vf_compact_list); free(rho_compact_list);
-	free(t_compact_list); free(p_compact_list);
+	free(ccc.rho_compact); free(ccc.p_compact); free(ccc.t_compact);
+	free(nmats); free(ccc.imaterial);
+	free(ccc.nextfrac); free(frac2cell); free(ccc.matids);
+	free(ccc.Vf_compact_list); free(ccc.rho_compact_list);
+	free(ccc.t_compact_list); free(ccc.p_compact_list);
 	return 0;
 }
