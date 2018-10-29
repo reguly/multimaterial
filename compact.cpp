@@ -55,6 +55,7 @@ void compact_cell_centric(full_data cc, compact_data ccc)
 	int sizey = cc.sizey;
 	int Nmats = cc.Nmats;
 	int mmc_cells = ccc.mmc_cells;
+  int mm_len = ccc.mm_len;
 
   #if defined(ACC)
   #pragma acc data copy(ccc.imaterial[0:sizex*sizey],ccc.matids[0:mm_len], ccc.nextfrac[0:mm_len], ccc.x[0:sizex*sizey], ccc.y[0:sizex*sizey],ccc.n[Nmats], ccc.rho_compact[0:sizex*sizey], ccc.rho_compact_list[0:mm_len], ccc.rho_ave_compact[0:sizex*sizey], ccc.p_compact[0:sizex*sizey], ccc.p_compact_list[0:mm_len], ccc.t_compact[0:sizex*sizey], ccc.t_compact_list[0:mm_len], ccc.V[0:sizex*sizey], ccc.Vf_compact_list[0:mm_len], ccc.mmc_index[0:mmc_cells+1], ccc.mmc_i[0:mmc_cells], ccc.mmc_j[0:mmc_cells], ccc.rho_mat_ave_compact[0:sizex*sizey], ccc.rho_mat_ave_compact_list[0:mm_len])
@@ -154,8 +155,8 @@ void compact_cell_centric(full_data cc, compact_data ccc)
 					ccc.p_compact_list[ix] = (nm * ccc.rho_compact_list[ix] * ccc.t_compact_list[ix]) / ccc.Vf_compact_list[ix];
 				}
 #else
-				for (int idx = mmc_index[-ix]; idx < mmc_index[-ix+1]; idx++) {
-					double nm = n[matids[idx]];
+				for (int idx = ccc.mmc_index[-ix]; idx < ccc.mmc_index[-ix+1]; idx++) {
+					double nm = ccc.n[ccc.matids[idx]];
 					ccc.p_compact_list[idx] = (nm * ccc.rho_compact_list[idx] * ccc.t_compact_list[idx]) / ccc.Vf_compact_list[idx];
 				}
 #endif
@@ -169,7 +170,7 @@ void compact_cell_centric(full_data cc, compact_data ccc)
 			}
 		}
 	}
-printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells, mmc_index[mmc_cells]); 
+printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells, ccc.mmc_index[mmc_cells]); 
 #ifndef FUSED
   #if defined(OMP)
   #pragma omp parallel for simd
