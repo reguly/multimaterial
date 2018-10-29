@@ -2,18 +2,62 @@
 #include <stdio.h>
 #include <omp.h>
 
-void compact_cell_centric(int sizex, int sizey, int Nmats,
-	int *imaterial, int *matids, int *nextfrac,
-	double *x, double *y, double *n,
-	double *rho_compact, double *rho_compact_list, 
-	double *rho_mat_ave_compact, double *rho_mat_ave_compact_list, 
-  double *rho_ave_compact,
-	double *p_compact, double *p_compact_list,
-	double *t_compact, double *t_compact_list,
-	double *V, double *Vf_compact_list, int mm_len, int mmc_cells, int *mmc_index, int *mmc_i, int *mmc_j)
+
+struct full_data
 {
+	int sizex;
+	int sizey;
+	int Nmats;
+	double * __restrict__ rho;
+	double * __restrict__ rho_mat_ave;
+	double * __restrict__ p;
+	double * __restrict__ Vf;
+	double * __restrict__ t;
+	double * __restrict__ V;
+	double * __restrict__ x;
+	double * __restrict__ y;
+	double * __restrict__ n;
+	double * __restrict__ rho_ave;
+};
+
+struct compact_data
+{
+	int sizex;
+	int sizey;
+	int Nmats;
+	double * __restrict__ rho_compact;
+	double * __restrict__ rho_compact_list;
+	double * __restrict__ rho_mat_ave_compact;
+	double * __restrict__ rho_mat_ave_compact_list;
+	double * __restrict__ p_compact;
+	double * __restrict__ p_compact_list;
+	double * __restrict__ Vf_compact_list;
+	double * __restrict__ t_compact;
+	double * __restrict__ t_compact_list;
+	double * __restrict__ V;
+	double * __restrict__ x;
+	double * __restrict__ y;
+	double * __restrict__ n;
+	double * __restrict__ rho_ave_compact;
+	int * __restrict__ imaterial;
+	int * __restrict__ matids;
+	int * __restrict__ nextfrac;
+	int * __restrict__ mmc_index;
+	int * __restrict__ mmc_i;
+	int * __restrict__ mmc_j;
+	int mm_len;
+	int mmc_cells;
+};
+
+void compact_cell_centric(full_data cc, compact_data ccc)
+{
+	int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
+	int mmc_cells = ccc.mmc_cells;
+
   #if defined(ACC)
-  #pragma acc data copy(imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells],rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
+  #pragma acc data copy(ccc.imaterial[0:sizex*sizey],ccc.matids[0:mm_len], ccc.nextfrac[0:mm_len], ccc.x[0:sizex*sizey], ccc.y[0:sizex*sizey],ccc.n[Nmats], ccc.rho_compact[0:sizex*sizey], ccc.rho_compact_list[0:mm_len], ccc.rho_ave_compact[0:sizex*sizey], ccc.p_compact[0:sizex*sizey], ccc.p_compact_list[0:mm_len], ccc.t_compact[0:sizex*sizey], ccc.t_compact_list[0:mm_len], ccc.V[0:sizex*sizey], ccc.Vf_compact_list[0:mm_len], ccc.mmc_index[0:mmc_cells+1], ccc.mmc_i[0:mmc_cells], ccc.mmc_j[0:mmc_cells], ccc.rho_mat_ave_compact[0:sizex*sizey], ccc.rho_mat_ave_compact_list[0:mm_len])
   #endif
   { 
 	// Cell-centric algorithms
@@ -35,27 +79,27 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 
 #ifdef FUSED
 			double ave = 0.0;
-			int ix = imaterial[i+sizex*j];
+			int ix = ccc.imaterial[i+sizex*j];
 			if (ix <= 0) {
 				// condition is 'ix >= 0', this is the equivalent of
 				// 'until ix < 0' from the paper
 #ifdef LINKED
 #pragma novector
-				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
-					ave += rho_compact_list[ix] * Vf_compact_list[ix];
+				for (ix = -ix; ix >= 0; ix = ccc.nextfrac[ix]) {
+					ave += ccc.rho_compact_list[ix] * ccc.Vf_compact_list[ix];
 				}
 #else
-				for (int idx = mmc_index[-ix]; idx < mmc_index[-ix+1]; idx++) {
-					ave += rho_compact_list[idx] * Vf_compact_list[idx];	
+				for (int idx = ccc.mmc_index[-ix]; idx < ccc.mmc_index[-ix+1]; idx++) {
+					ave += ccc.rho_compact_list[idx] * ccc.Vf_compact_list[idx];	
 				}
 #endif
-				rho_ave_compact[i+sizex*j] = ave/V[i+sizex*j];
+				ccc.rho_ave_compact[i+sizex*j] = ave/ccc.V[i+sizex*j];
 			}
 			else {
 #endif
 				// We use a distinct output array for averages.
 				// In case of a pure cell, the average density equals to the total.
-				rho_ave_compact[i+sizex*j] = rho_compact[i+sizex*j] / V[i+sizex*j];
+				ccc.rho_ave_compact[i+sizex*j] = ccc.rho_compact[i+sizex*j] / ccc.V[i+sizex*j];
 #ifdef FUSED
 			}
 #endif
@@ -68,12 +112,12 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
   #pragma acc parallel
   #pragma acc loop independent
   #endif
-  for (int c = 0; c < mmc_cells; c++) {
+  for (int c = 0; c < ccc.mmc_cells; c++) {
     double ave = 0.0;
-    for (int m = mmc_index[c]; m < mmc_index[c+1]; m++) {
-      ave +=  rho_compact_list[m] * Vf_compact_list[m];
+    for (int m = ccc.mmc_index[c]; m < ccc.mmc_index[c+1]; m++) {
+      ave +=  ccc.rho_compact_list[m] * ccc.Vf_compact_list[m];
     }
-    rho_ave_compact[mmc_i[c]+sizex*mmc_j[c]] = ave/V[mmc_i[c]+sizex*mmc_j[c]];
+    ccc.rho_ave_compact[ccc.mmc_i[c]+sizex*ccc.mmc_j[c]] = ave/ccc.V[ccc.mmc_i[c]+sizex*ccc.mmc_j[c]];
   }
 #endif
   printf("Compact matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
@@ -94,7 +138,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
   #pragma acc loop independent
   #endif
 		for (int i = 0; i < sizex; i++) {
-			int ix = imaterial[i+sizex*j];
+			int ix = ccc.imaterial[i+sizex*j];
 
 
 			if (ix <= 0) {
@@ -105,14 +149,14 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 				// condition is 'ix >= 0', this is the equivalent of
 				// 'until ix < 0' from the paper
 #ifdef LINKED
-				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
-					double nm = n[matids[ix]];
-					p_compact_list[ix] = (nm * rho_compact_list[ix] * t_compact_list[ix]) / Vf_compact_list[ix];
+				for (ix = -ix; ix >= 0; ix = ccc.nextfrac[ix]) {
+					double nm = ccc.n[ccc.matids[ix]];
+					ccc.p_compact_list[ix] = (nm * ccc.rho_compact_list[ix] * ccc.t_compact_list[ix]) / ccc.Vf_compact_list[ix];
 				}
 #else
 				for (int idx = mmc_index[-ix]; idx < mmc_index[-ix+1]; idx++) {
 					double nm = n[matids[idx]];
-					p_compact_list[idx] = (nm * rho_compact_list[idx] * t_compact_list[idx]) / Vf_compact_list[idx];
+					ccc.p_compact_list[idx] = (nm * ccc.rho_compact_list[idx] * ccc.t_compact_list[idx]) / ccc.Vf_compact_list[idx];
 				}
 #endif
 #endif
@@ -121,7 +165,7 @@ void compact_cell_centric(int sizex, int sizey, int Nmats,
 				// NOTE: HACK: we index materials from zero, but zero can be a list index
 				int mat = ix - 1;
 				// NOTE: There is no division by Vf here, because the fractional volume is 1.0 in the pure cell case.
-				p_compact[i+sizex*j] = n[mat] * rho_compact[i+sizex*j] * t_compact[i+sizex*j];;
+				ccc.p_compact[i+sizex*j] = ccc.n[mat] * ccc.rho_compact[i+sizex*j] * ccc.t_compact[i+sizex*j];;
 			}
 		}
 	}
@@ -133,9 +177,9 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
   #pragma acc parallel
   #pragma acc loop independent
   #endif
-  for (int idx = 0; idx < mmc_index[mmc_cells]; idx++) {
-    double nm = n[matids[idx]];
-    p_compact_list[idx] = (nm * rho_compact_list[idx] * t_compact_list[idx]) / Vf_compact_list[idx];
+  for (int idx = 0; idx < ccc.mmc_index[mmc_cells]; idx++) {
+    double nm = ccc.n[ccc.matids[idx]];
+    ccc.p_compact_list[idx] = (nm * ccc.rho_compact_list[idx] * ccc.t_compact_list[idx]) / ccc.Vf_compact_list[idx];
   }
 #endif
 
@@ -157,8 +201,8 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
   #endif
 		for (int i = 1; i < sizex-1; i++) {
 			// o: outer
-			double xo = x[i+sizex*j];
-			double yo = y[i+sizex*j];
+			double xo = ccc.x[i+sizex*j];
+			double yo = ccc.y[i+sizex*j];
 
 			// There are at most 9 neighbours in 2D case.
 			double dsqr[9];
@@ -170,26 +214,26 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
 					dsqr[(nj+1)*3 + (ni+1)] = 0.0;
 
 					// i: inner
-					double xi = x[(i+ni)+sizex*(j+nj)];
-					double yi = y[(i+ni)+sizex*(j+nj)];
+					double xi = ccc.x[(i+ni)+sizex*(j+nj)];
+					double yi = ccc.y[(i+ni)+sizex*(j+nj)];
 
 					dsqr[(nj+1)*3 + (ni+1)] += (xo - xi) * (xo - xi);
 					dsqr[(nj+1)*3 + (ni+1)] += (yo - yi) * (yo - yi);
 				}
 			}
 
-			int ix = imaterial[i+sizex*j];
+			int ix = ccc.imaterial[i+sizex*j];
 
 			if (ix <= 0) {
 				// condition is 'ix >= 0', this is the equivalent of
 				// 'until ix < 0' from the paper
 				#ifdef LINKED
-				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
+				for (ix = -ix; ix >= 0; ix = ccc.nextfrac[ix]) {
 				#else
-				for (int ix = mmc_index[-imaterial[i+sizex*j]]; ix < mmc_index[-imaterial[i+sizex*j]+1]; ix++) {
+				for (int ix = ccc.mmc_index[-ccc.imaterial[i+sizex*j]]; ix < ccc.mmc_index[-ccc.imaterial[i+sizex*j]+1]; ix++) {
 				#endif
 
-					int mat = matids[ix];
+					int mat = ccc.matids[ix];
 					double rho_sum = 0.0;
 					int Nn = 0;
 
@@ -197,18 +241,18 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
 					for (int nj = -1; nj <= 1; nj++) {
 						for (int ni = -1; ni <= 1; ni++) {
 							int ci = i+ni, cj = j+nj;
-							int jx = imaterial[ci+sizex*cj];
+							int jx = ccc.imaterial[ci+sizex*cj];
 
 							if (jx <= 0) {
 								// condition is 'jx >= 0', this is the equivalent of
 								// 'until jx < 0' from the paper
 								#ifdef LINKED
-								for (jx = -jx; jx >= 0; jx = nextfrac[jx]) {
+								for (jx = -jx; jx >= 0; jx = ccc.nextfrac[jx]) {
 								#else
-								for (int jx = mmc_index[-imaterial[ci+sizex*cj]]; jx < mmc_index[-imaterial[ci+sizex*cj]+1]; jx++) {
+								for (int jx = ccc.mmc_index[-ccc.imaterial[ci+sizex*cj]]; jx < ccc.mmc_index[-ccc.imaterial[ci+sizex*cj]+1]; jx++) {
 								#endif
-									if (matids[jx] == mat) {
-										rho_sum += rho_compact_list[jx] / dsqr[(nj+1)*3 + (ni+1)];
+									if (ccc.matids[jx] == mat) {
+										rho_sum += ccc.rho_compact_list[jx] / dsqr[(nj+1)*3 + (ni+1)];
 										Nn += 1;
 
 										// The loop has an extra condition: "and not found".
@@ -224,14 +268,14 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
 								// NOTE: HACK: we index materials from zero, but zero can be a list index
 								int mat_neighbour = jx - 1;
 								if (mat == mat_neighbour) {
-									rho_sum += rho_compact[ci+sizex*cj] / dsqr[(nj+1)*3 + (ni+1)];
+									rho_sum += ccc.rho_compact[ci+sizex*cj] / dsqr[(nj+1)*3 + (ni+1)];
 									Nn += 1;
 								}
 							} // end if (jx <= 0)
 						} // end for (int ni)
 					} // end for (int nj)
 
-					rho_mat_ave_compact_list[ix] = rho_sum / Nn;
+					ccc.rho_mat_ave_compact_list[ix] = rho_sum / Nn;
 				} // end for (ix = -ix)
 			} // end if (ix <= 0)
 			else {
@@ -254,18 +298,18 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
 							continue;
 
 						int ci = i+ni, cj = j+nj;
-						int jx = imaterial[ci+sizex*cj];
+						int jx = ccc.imaterial[ci+sizex*cj];
 
 						if (jx <= 0) {
 							// condition is 'jx >= 0', this is the equivalent of
 							// 'until jx < 0' from the paper
 							#ifdef LINKED
-							for (jx = -jx; jx >= 0; jx = nextfrac[jx]) {
+							for (jx = -jx; jx >= 0; jx = ccc.nextfrac[jx]) {
 							#else
-							for (int jx = mmc_index[-imaterial[ci+sizex*cj]]; jx < mmc_index[-imaterial[ci+sizex*cj]+1]; jx++) {
+							for (int jx = ccc.mmc_index[-ccc.imaterial[ci+sizex*cj]]; jx < ccc.mmc_index[-ccc.imaterial[ci+sizex*cj]+1]; jx++) {
 							#endif
-								if (matids[jx] == mat) {
-									rho_sum += rho_compact_list[jx] / dsqr[(nj+1)*3 + (ni+1)];
+								if (ccc.matids[jx] == mat) {
+									rho_sum += ccc.rho_compact_list[jx] / dsqr[(nj+1)*3 + (ni+1)];
 									Nn += 1;
 
 									// The loop has an extra condition: "and not found".
@@ -281,14 +325,14 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
 							// NOTE: HACK: we index materials from zero, but zero can be a list index
 							int mat_neighbour = jx - 1;
 							if (mat == mat_neighbour) {
-								rho_sum += rho_compact[ci+sizex*cj] / dsqr[(nj+1)*3 + (ni+1)];
+								rho_sum += ccc.rho_compact[ci+sizex*cj] / dsqr[(nj+1)*3 + (ni+1)];
 								Nn += 1;
 							}
 						} // end if (jx <= 0)
 					} // end for (int ni)
 				} // end for (int nj)
 
-				rho_mat_ave_compact[i+sizex*j] = rho_sum / Nn;
+				ccc.rho_mat_ave_compact[i+sizex*j] = rho_sum / Nn;
 			} // end else
 		}
 	}
@@ -296,38 +340,40 @@ printf("mm_len: %d, mmc_cells %d, mmc_index[mmc_cells] %d\n", mm_len, mmc_cells,
   }
 }
 
-bool compact_check_results(int sizex, int sizey, int Nmats,
-	int *imaterial, int *matids, int *nextfrac,
-	double *rho_ave, double *rho_ave_compact,
-	double *p, double *p_compact, double *p_compact_list,
-	double *rho, double *rho_compact, double *rho_compact_list,  double *rho_mat_ave, double *rho_mat_ave_compact, double *rho_mat_ave_compact_list, int *mmc_index) 
+bool compact_check_results(full_data cc, compact_data ccc) 
 {
+
+	int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
+	int mmc_cells = ccc.mmc_cells;
+
 	printf("Checking results of compact representation... ");
 
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
-			if (abs(rho_ave[i+sizex*j] - rho_ave_compact[i+sizex*j]) > 0.0001) {
+			if (fabs(cc.rho_ave[i+sizex*j] - ccc.rho_ave_compact[i+sizex*j]) > 0.0001) {
 				printf("1. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d)\n",
-					rho_ave[i+sizex*j], rho_ave_compact[i+sizex*j], i, j);
+					cc.rho_ave[i+sizex*j], ccc.rho_ave_compact[i+sizex*j], i, j);
 				return false;
 			}
-			int ix = imaterial[i+sizex*j];
+			int ix = ccc.imaterial[i+sizex*j];
 			if (ix <= 0) {
 #ifdef LINKED
-				for (ix = -ix; ix >= 0; ix = nextfrac[ix]) {
+				for (ix = -ix; ix >= 0; ix = ccc.nextfrac[ix]) {
 #else
-        for (int ix = mmc_index[-imaterial[i+sizex*j]]; ix < mmc_index[-imaterial[i+sizex*j]+1]; ix++) {
+        for (int ix = ccc.mmc_index[-ccc.imaterial[i+sizex*j]]; ix < ccc.mmc_index[-ccc.imaterial[i+sizex*j]+1]; ix++) {
 #endif
-					int mat = matids[ix];
-					if (abs(p[(i+sizex*j)*Nmats+mat] - p_compact_list[ix]) > 0.0001) {
+					int mat = ccc.matids[ix];
+					if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - ccc.p_compact_list[ix]) > 0.0001) {
 						printf("2. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-							p[(i+sizex*j)*Nmats+mat], p_compact_list[ix], i, j, mat);
+							cc.p[(i+sizex*j)*Nmats+mat], ccc.p_compact_list[ix], i, j, mat);
 						return false;
 					}
 
-					if (abs(rho[(i+sizex*j)*Nmats+mat] - rho_compact_list[ix]) > 0.0001) {
+					if (fabs(cc.rho[(i+sizex*j)*Nmats+mat] - ccc.rho_compact_list[ix]) > 0.0001) {
 						printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-							rho[(i+sizex*j)*Nmats+mat], rho_compact_list[ix], i, j, mat);
+							cc.rho[(i+sizex*j)*Nmats+mat], ccc.rho_compact_list[ix], i, j, mat);
 						return false;
 					}
 				}
@@ -335,15 +381,15 @@ bool compact_check_results(int sizex, int sizey, int Nmats,
 			else {
 				// NOTE: HACK: we index materials from zero, but zero can be a list index
 				int mat = ix - 1;
-				if (abs(p[(i+sizex*j)*Nmats+mat] - p_compact[i+sizex*j]) > 0.0001) {
+				if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - ccc.p_compact[i+sizex*j]) > 0.0001) {
 					printf("2. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-						p[(i+sizex*j)*Nmats+mat], p_compact[i+sizex*j], i, j, mat);
+						cc.p[(i+sizex*j)*Nmats+mat], ccc.p_compact[i+sizex*j], i, j, mat);
 					return false;
 				}
 
-				if (abs(rho_mat_ave[(i+sizex*j)*Nmats+mat] - rho_mat_ave_compact[i+sizex*j]) > 0.0001) {
+				if (fabs(cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] - ccc.rho_mat_ave_compact[i+sizex*j]) > 0.0001) {
 					printf("3. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-						rho_mat_ave[(i+sizex*j)*Nmats+mat], rho_mat_ave_compact[i+sizex*j], i, j, mat);
+						cc.rho_mat_ave[(i+sizex*j)*Nmats+mat], ccc.rho_mat_ave_compact[i+sizex*j], i, j, mat);
 					return false;
 				}
 			}

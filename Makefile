@@ -1,6 +1,6 @@
-CC=pgc++ #g++ #pgc++
+CC=g++ #pgc++
 ACCFLAGS=-DACC -DLINKED -fast -O3 -acc -ta=tesla,cc60 -Minfo=acc -mp -Mcuda #-Ofast -mavx2 -mp
-OMPFLAGS=-DOMP -O3 -g -mp #-qopenmp -xHost -qopt-report #-DFUSED #-DLINKED #-fopenmp #-mp -fastsse -fast #-DLINKED
+OMPFLAGS=-DOMP -O3 -g -fopenmp #-qopenmp -xHost -qopt-report #-DFUSED #-DLINKED #-fopenmp #-mp -fastsse -fast #-DLINKED
 #
 NVCCFLAGS=-O3 -arch=sm_60 #-DFUSED #-DLINKED
 
