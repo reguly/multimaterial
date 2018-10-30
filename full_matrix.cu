@@ -3,6 +3,25 @@
 #include <omp.h>
 #include <cuda.h>
 
+
+struct full_data
+{
+	int sizex;
+	int sizey;
+	int Nmats;
+	double * __restrict__ rho;
+	double * __restrict__ rho_mat_ave;
+	double * __restrict__ p;
+	double * __restrict__ Vf;
+	double * __restrict__ t;
+	double * __restrict__ V;
+	double * __restrict__ x;
+	double * __restrict__ y;
+	double * __restrict__ n;
+	double * __restrict__ rho_ave;
+};
+
+
 char *cp_to_device(char *from, size_t size) {
 	char *tmp;
 	cudaMalloc((void**)&tmp, size);
@@ -164,21 +183,21 @@ __global__ void mc_loop3(const double * __restrict rho, double * __restrict rho_
 	}
 }
 
-void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
-	double *V, double *x, double *y,
-	double *n, double *rho_ave)
+void full_matrix_cell_centric(full_data cc)
 {
-	double *d_rho = (double *)cp_to_device((char*)rho, sizex*sizey*Nmats*sizeof(double));
-	double *d_rho_mat_ave = (double *)cp_to_device((char*)rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
-	double *d_p = (double *)cp_to_device((char*)p, sizex*sizey*Nmats*sizeof(double));
-	double *d_t = (double *)cp_to_device((char*)t, sizex*sizey*Nmats*sizeof(double));
-	double *d_Vf = (double *)cp_to_device((char*)Vf, sizex*sizey*Nmats*sizeof(double));
-	double *d_V = (double *)cp_to_device((char*)V, sizex*sizey*sizeof(double));
-	double *d_x = (double *)cp_to_device((char*)x, sizex*sizey*sizeof(double));
-	double *d_y = (double *)cp_to_device((char*)y, sizex*sizey*sizeof(double));
-	double *d_n = (double *)cp_to_device((char*)n, Nmats*sizeof(double));
-	double *d_rho_ave = (double *)cp_to_device((char*)rho_ave, sizex*sizey*sizeof(double));
+	int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
+	double *d_rho = (double *)cp_to_device((char*)cc.rho, sizex*sizey*Nmats*sizeof(double));
+	double *d_rho_mat_ave = (double *)cp_to_device((char*)cc.rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
+	double *d_p = (double *)cp_to_device((char*)cc.p, sizex*sizey*Nmats*sizeof(double));
+	double *d_t = (double *)cp_to_device((char*)cc.t, sizex*sizey*Nmats*sizeof(double));
+	double *d_Vf = (double *)cp_to_device((char*)cc.Vf, sizex*sizey*Nmats*sizeof(double));
+	double *d_V = (double *)cp_to_device((char*)cc.V, sizex*sizey*sizeof(double));
+	double *d_x = (double *)cp_to_device((char*)cc.x, sizex*sizey*sizeof(double));
+	double *d_y = (double *)cp_to_device((char*)cc.y, sizex*sizey*sizeof(double));
+	double *d_n = (double *)cp_to_device((char*)cc.n, Nmats*sizeof(double));
+	double *d_rho_ave = (double *)cp_to_device((char*)cc.rho_ave, sizex*sizey*sizeof(double));
 
 	int thx = 32;
 	int thy = 4;
@@ -205,33 +224,33 @@ void full_matrix_cell_centric(int sizex, int sizey, int Nmats,
   cudaDeviceSynchronize();
   printf("Full matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
 
-  cp_to_host((char*)rho, (char*)d_rho, sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)rho_mat_ave, (char*)d_rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)p,   (char*)d_p,   sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)t,   (char*)d_t,   sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)Vf,  (char*)d_Vf,  sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)V,   (char*)d_V,   sizex*sizey*sizeof(double));
-  cp_to_host((char*)x,   (char*)d_x,   sizex*sizey*sizeof(double));
-  cp_to_host((char*)y,   (char*)d_y,   sizex*sizey*sizeof(double));
-  cp_to_host((char*)n,   (char*)d_n,   Nmats*sizeof(double));
-  cp_to_host((char*)rho_ave, (char*)d_rho_ave, sizex*sizey*sizeof(double));
+  cp_to_host((char*)cc.rho, (char*)d_rho, sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)cc.rho_mat_ave, (char*)d_rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)cc.p,   (char*)d_p,   sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)cc.t,   (char*)d_t,   sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)cc.Vf,  (char*)d_Vf,  sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)cc.V,   (char*)d_V,   sizex*sizey*sizeof(double));
+  cp_to_host((char*)cc.x,   (char*)d_x,   sizex*sizey*sizeof(double));
+  cp_to_host((char*)cc.y,   (char*)d_y,   sizex*sizey*sizeof(double));
+  cp_to_host((char*)cc.n,   (char*)d_n,   Nmats*sizeof(double));
+  cp_to_host((char*)cc.rho_ave, (char*)d_rho_ave, sizex*sizey*sizeof(double));
 }
 
-void full_matrix_material_centric(int sizex, int sizey, int Nmats,
-	double *rho, double *rho_mat_ave, double *p, double *Vf, double *t,
-	double *V, double *x, double *y,
-	double *n, double *rho_ave)
+void full_matrix_material_centric(full_data cc, full_data mc)
 {
-	double *d_rho = (double *)cp_to_device((char*)rho, sizex*sizey*Nmats*sizeof(double));
-	double *d_p = (double *)cp_to_device((char*)p, sizex*sizey*Nmats*sizeof(double));
-	double *d_t = (double *)cp_to_device((char*)t, sizex*sizey*Nmats*sizeof(double));
-	double *d_Vf = (double *)cp_to_device((char*)Vf, sizex*sizey*Nmats*sizeof(double));
-	double *d_V = (double *)cp_to_device((char*)V, sizex*sizey*sizeof(double));
-	double *d_x = (double *)cp_to_device((char*)x, sizex*sizey*sizeof(double));
-	double *d_y = (double *)cp_to_device((char*)y, sizex*sizey*sizeof(double));
-	double *d_n = (double *)cp_to_device((char*)n, Nmats*sizeof(double));
-	double *d_rho_ave = (double *)cp_to_device((char*)rho_ave, sizex*sizey*sizeof(double));
-	double *d_rho_mat_ave = (double *)cp_to_device((char*)rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
+	int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
+	double *d_rho = (double *)cp_to_device((char*)mc.rho, sizex*sizey*Nmats*sizeof(double));
+	double *d_p = (double *)cp_to_device((char*)mc.p, sizex*sizey*Nmats*sizeof(double));
+	double *d_t = (double *)cp_to_device((char*)mc.t, sizex*sizey*Nmats*sizeof(double));
+	double *d_Vf = (double *)cp_to_device((char*)mc.Vf, sizex*sizey*Nmats*sizeof(double));
+	double *d_V = (double *)cp_to_device((char*)mc.V, sizex*sizey*sizeof(double));
+	double *d_x = (double *)cp_to_device((char*)mc.x, sizex*sizey*sizeof(double));
+	double *d_y = (double *)cp_to_device((char*)mc.y, sizex*sizey*sizeof(double));
+	double *d_n = (double *)cp_to_device((char*)mc.n, Nmats*sizeof(double));
+	double *d_rho_ave = (double *)cp_to_device((char*)mc.rho_ave, sizex*sizey*sizeof(double));
+	double *d_rho_mat_ave = (double *)cp_to_device((char*)mc.rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
 
 	int thx = 32;
 	int thy = 4;
@@ -259,43 +278,44 @@ void full_matrix_material_centric(int sizex, int sizey, int Nmats,
   cudaDeviceSynchronize();
   printf("Full matrix, material centric, alg 2: %g sec\n", omp_get_wtime()-t1);
 
-  cp_to_host((char*)rho, (char*)d_rho, sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)p,   (char*)d_p,   sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)t,   (char*)d_t,   sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)Vf,  (char*)d_Vf,  sizex*sizey*Nmats*sizeof(double));
-  cp_to_host((char*)V,   (char*)d_V,   sizex*sizey*sizeof(double));
-  cp_to_host((char*)x,   (char*)d_x,   sizex*sizey*sizeof(double));
-  cp_to_host((char*)y,   (char*)d_y,   sizex*sizey*sizeof(double));
-  cp_to_host((char*)n,   (char*)d_n,   Nmats*sizeof(double));
-  cp_to_host((char*)rho_ave, (char*)d_rho_ave, sizex*sizey*sizeof(double));
-  cp_to_host((char*)rho_mat_ave, (char*)d_rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)mc.rho, (char*)d_rho, sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)mc.p,   (char*)d_p,   sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)mc.t,   (char*)d_t,   sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)mc.Vf,  (char*)d_Vf,  sizex*sizey*Nmats*sizeof(double));
+  cp_to_host((char*)mc.V,   (char*)d_V,   sizex*sizey*sizeof(double));
+  cp_to_host((char*)mc.x,   (char*)d_x,   sizex*sizey*sizeof(double));
+  cp_to_host((char*)mc.y,   (char*)d_y,   sizex*sizey*sizeof(double));
+  cp_to_host((char*)mc.n,   (char*)d_n,   Nmats*sizeof(double));
+  cp_to_host((char*)mc.rho_ave, (char*)d_rho_ave, sizex*sizey*sizeof(double));
+  cp_to_host((char*)mc.rho_mat_ave, (char*)d_rho_mat_ave, sizex*sizey*Nmats*sizeof(double));
 }
 
-bool full_matrix_check_results(int sizex, int sizey, int Nmats,
-	double *rho_ave, double *rho_ave_mat, double *p, double *p_mat,
-	double *rho, double *rho_mat, double *rho_mat_ave, double *rho_mat_ave_mat)
+bool full_matrix_check_results(full_data cc, full_data mc)
 {
+	int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
 	int ncells = sizex * sizey;
 	printf("Checking results of full matrix representation... ");
 
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
-			if (abs(rho_ave[i+sizex*j] - rho_ave_mat[i+sizex*j]) > 0.0001) {
+			if (fabs(cc.rho_ave[i+sizex*j] - mc.rho_ave[i+sizex*j]) > 0.0001) {
 				printf("1. cell-centric and material-centric values are not equal! (%f, %f, %d, %d)\n",
-					rho_ave[i+sizex*j], rho_ave_mat[i+sizex*j], i, j);
+					cc.rho_ave[i+sizex*j], mc.rho_ave[i+sizex*j], i, j);
 				return false;
 			}
 
 			for (int mat = 0; mat < Nmats; mat++) {
-				if (abs(p[(i+sizex*j)*Nmats+mat] - p_mat[ncells*mat + i+sizex*j]) > 0.0001) {
+				if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - mc.p[ncells*mat + i+sizex*j]) > 0.0001) {
 					printf("2. cell-centric and material-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-						p[(i+sizex*j)*Nmats+mat], p_mat[ncells*mat + i+sizex*j], i, j, mat);
+						cc.p[(i+sizex*j)*Nmats+mat], mc.p[ncells*mat + i+sizex*j], i, j, mat);
 					return false;
 				}
 
-				if (abs(rho_mat_ave[(i+sizex*j)*Nmats+mat] - rho_mat_ave_mat[ncells*mat + i+sizex*j]) > 0.0001) {
+				if (fabs(cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] - mc.rho_mat_ave[ncells*mat + i+sizex*j]) > 0.0001) {
 					printf("3. cell-centric and material-centric values are not equal! (%f, %f, %d, %d, %d)\n",
-						rho_mat_ave[(i+sizex*j)*Nmats+mat], rho_mat_ave_mat[ncells*mat + i+sizex*j], i, j, mat);
+						cc.rho_mat_ave[(i+sizex*j)*Nmats+mat], mc.rho_mat_ave[ncells*mat + i+sizex*j], i, j, mat);
 					return false;
 				}
 			}

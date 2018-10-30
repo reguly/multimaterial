@@ -371,8 +371,6 @@ bool compact_check_results(full_data cc, compact_data ccc)
 	int sizex = cc.sizex;
 	int sizey = cc.sizey;
 	int Nmats = cc.Nmats;
-	int mmc_cells = ccc.mmc_cells;
-  	int mm_len = ccc.mm_len;
 
 
 	printf("Checking results of compact representation... ");
@@ -391,7 +389,7 @@ bool compact_check_results(full_data cc, compact_data ccc)
 #else
         		for (int ix = ccc.mmc_index[-ccc.imaterial[i+sizex*j]]; ix < ccc.mmc_index[-ccc.imaterial[i+sizex*j]+1]; ix++) {
 #endif
-					int mat = matids[ix];
+					int mat = ccc.matids[ix];
 					if (fabs(cc.p[(i+sizex*j)*Nmats+mat] - ccc.p_compact_list[ix]) > 0.0001) {
 						printf("2. full matrix and compact cell-centric values are not equal! (%f, %f, %d, %d, %d)\n",
 							cc.p[(i+sizex*j)*Nmats+mat], ccc.p_compact_list[ix], i, j, mat);

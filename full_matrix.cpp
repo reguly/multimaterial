@@ -26,10 +26,20 @@ void full_matrix_cell_centric(full_data cc)
 	int sizex = cc.sizex;
 	int sizey = cc.sizey;
 	int Nmats = cc.Nmats;
+  double * __restrict__ Vf = cc.Vf;
+  double * __restrict__ V = cc.V;
+  double * __restrict__ rho = cc.rho;
+  double * __restrict__ rho_ave = cc.rho_ave;
+  double * __restrict__ p = cc.p;
+  double * __restrict__ t = cc.t;
+  double * __restrict__ x = cc.x;
+  double * __restrict__ y = cc.y;
+  double * __restrict__ n = cc.n;
+  double * __restrict__ rho_mat_ave = cc.rho_mat_ave;
 
 #if defined(ACC)
-#pragma acc data copy(cc.rho[0:sizex*sizey*Nmats], cc.p[0:sizex*sizey*Nmats], cc.t[0:sizex*sizey*Nmats], cc.Vf[0:sizex*sizey*Nmats]) \
-  copy(cc.V[0:sizex*sizey],cc.x[0:sizex*sizey],cc.y[0:sizex*sizey],cc.n[0:Nmats],cc.rho_ave[0:sizex*sizey]) \
+#pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
+  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey]) \
   copy(rho_mat_ave[0:sizex*sizey*Nmats])
 #endif
 {
@@ -51,10 +61,10 @@ void full_matrix_cell_centric(full_data cc)
 //#pragma omp simd reduction(+:ave)
 			for (int mat = 0; mat < Nmats; mat++) {
 				// Optimisation:
-				if (cc.Vf[(i+sizex*j)*Nmats+mat] > 0.0)
-					ave += cc.rho[(i+sizex*j)*Nmats+mat]*cc.Vf[(i+sizex*j)*Nmats+mat];
+				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0)
+					ave += rho[(i+sizex*j)*Nmats+mat]*Vf[(i+sizex*j)*Nmats+mat];
 			}
-			cc.rho_ave[i+sizex*j] = ave/cc.V[i+sizex*j];
+			rho_ave[i+sizex*j] = ave/V[i+sizex*j];
 		}
 	}
   printf("Full matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
@@ -77,12 +87,12 @@ void full_matrix_cell_centric(full_data cc)
   #endif
 //#pragma omp simd
 			for (int mat = 0; mat < Nmats; mat++) {
-				if (cc.Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
-					double nm = cc.n[mat];
-					cc.p[(i+sizex*j)*Nmats+mat] = (nm * cc.rho[(i+sizex*j)*Nmats+mat] * cc.t[(i+sizex*j)*Nmats+mat]) / cc.Vf[(i+sizex*j)*Nmats+mat];
+				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
+					double nm = n[mat];
+					p[(i+sizex*j)*Nmats+mat] = (nm * rho[(i+sizex*j)*Nmats+mat] * t[(i+sizex*j)*Nmats+mat]) / Vf[(i+sizex*j)*Nmats+mat];
 				}
 				else {
-					cc.p[(i+sizex*j)*Nmats+mat] = 0.0;
+					p[(i+sizex*j)*Nmats+mat] = 0.0;
 				}
 			}
 		}
@@ -103,8 +113,8 @@ void full_matrix_cell_centric(full_data cc)
   #endif
 		for (int i = 1; i < sizex-1; i++) {
 			// o: outer
-			double xo = cc.x[i+sizex*j];
-			double yo = cc.y[i+sizex*j];
+			double xo = x[i+sizex*j];
+			double yo = y[i+sizex*j];
 
 			// There are at most 9 neighbours in 2D case.
 			double dsqr[9];
@@ -115,8 +125,8 @@ void full_matrix_cell_centric(full_data cc)
 					dsqr[(nj+1)*3 + (ni+1)] = 0.0;
 
 					// i: inner
-					double xi = cc.x[(i+ni)+sizex*(j+nj)];
-					double yi = cc.y[(i+ni)+sizex*(j+nj)];
+					double xi = x[(i+ni)+sizex*(j+nj)];
+					double yi = y[(i+ni)+sizex*(j+nj)];
 
 					dsqr[(nj+1)*3 + (ni+1)] += (xo - xi) * (xo - xi);
 					dsqr[(nj+1)*3 + (ni+1)] += (yo - yi) * (yo - yi);
@@ -124,7 +134,7 @@ void full_matrix_cell_centric(full_data cc)
 			}
 //#pragma omp simd
 			for (int mat = 0; mat < Nmats; mat++) {
-				if (cc.Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
+				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
 					double rho_sum = 0.0;
 					int Nn = 0;
 
@@ -136,16 +146,16 @@ void full_matrix_cell_centric(full_data cc)
 							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
 								continue;
 
-							if (cc.Vf[((i+ni)+sizex*(j+nj))*Nmats+mat] > 0.0) {
-								rho_sum += cc.rho[((i+ni)+sizex*(j+nj))*Nmats+mat] / dsqr[(nj+1)*3 + (ni+1)];
+							if (Vf[((i+ni)+sizex*(j+nj))*Nmats+mat] > 0.0) {
+								rho_sum += rho[((i+ni)+sizex*(j+nj))*Nmats+mat] / dsqr[(nj+1)*3 + (ni+1)];
 								Nn += 1;
 							}
 						}
 					}
-					cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] = rho_sum / Nn;
+					rho_mat_ave[(i+sizex*j)*Nmats+mat] = rho_sum / Nn;
 				}
 				else {
-					cc.rho_mat_ave[(i+sizex*j)*Nmats+mat] = 0.0;
+					rho_mat_ave[(i+sizex*j)*Nmats+mat] = 0.0;
 				}
 			}
 		}
@@ -160,10 +170,20 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 	int sizey = mc.sizey;
 	int Nmats = mc.Nmats;
 	int ncells = sizex * sizey;
+  double * __restrict__ Vf = mc.Vf;
+  double * __restrict__ V = mc.V;
+  double * __restrict__ rho = mc.rho;
+  double * __restrict__ rho_ave = mc.rho_ave;
+  double * __restrict__ p = mc.p;
+  double * __restrict__ t = mc.t;
+  double * __restrict__ x = mc.x;
+  double * __restrict__ y = mc.y;
+  double * __restrict__ n = mc.n;
+  double * __restrict__ rho_mat_ave = mc.rho_mat_ave;
 #if defined(ACC)
-#pragma acc data copy(mc.rho[0:sizex*sizey*Nmats], mc.p[0:sizex*sizey*Nmats], mc.t[0:sizex*sizey*Nmats], mc.Vf[0:sizex*sizey*Nmats]) \
-  copy(mc.V[0:sizex*sizey],mc.x[0:sizex*sizey],mc.y[0:sizex*sizey],mc.n[0:Nmats],mc.rho_ave[0:sizex*sizey]) \
-  copy(mc.rho_mat_ave[0:sizex*sizey*Nmats])
+#pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
+  copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey]) \
+  copy(rho_mat_ave[0:sizex*sizey*Nmats])
 #endif
   {
 	// Material-centric algorithms
@@ -181,7 +201,7 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   #endif
 //#pragma omp simd
 		for (int i = 0; i < sizex; i++) {
-			mc.rho_ave[i+sizex*j] = 0.0;
+			rho_ave[i+sizex*j] = 0.0;
 		}
 	}
 
@@ -199,8 +219,8 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 //#pragma omp simd
 			for (int i = 0; i < sizex; i++) {
 				// Optimisation:
-				if (mc.Vf[ncells*mat + i+sizex*j] > 0.0)
-					mc.rho_ave[i+sizex*j] += mc.rho[ncells*mat + i+sizex*j] * mc.Vf[ncells*mat + i+sizex*j];
+				if (Vf[ncells*mat + i+sizex*j] > 0.0)
+					rho_ave[i+sizex*j] += rho[ncells*mat + i+sizex*j] * Vf[ncells*mat + i+sizex*j];
 			}
 		}
 	}
@@ -217,7 +237,7 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   #endif
 //#pragma omp simd
 		for (int i = 0; i < sizex; i++) {
-			mc.rho_ave[i+sizex*j] /= mc.V[i+sizex*j];
+			rho_ave[i+sizex*j] /= V[i+sizex*j];
 		}
 	}
   printf("Full matrix, material centric, alg 1: %g sec\n", omp_get_wtime()-t1);
@@ -240,12 +260,12 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   #endif
 //#pragma omp simd
 			for (int i = 0; i < sizex; i++) {
-        double nm = mc.n[mat];
-				if (mc.Vf[ncells*mat + i+sizex*j] > 0.0) {
-					mc.p[ncells*mat + i+sizex*j] = (nm * mc.rho[ncells*mat + i+sizex*j] * mc.t[ncells*mat + i+sizex*j]) / mc.Vf[ncells*mat + i+sizex*j];
+        double nm = n[mat];
+				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
+					p[ncells*mat + i+sizex*j] = (nm * rho[ncells*mat + i+sizex*j] * t[ncells*mat + i+sizex*j]) / Vf[ncells*mat + i+sizex*j];
 				}
 				else {
-					mc.p[ncells*mat + i+sizex*j] = 0.0;
+					p[ncells*mat + i+sizex*j] = 0.0;
 				}
 			}
 		}
@@ -270,10 +290,10 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   #endif
 //#pragma omp simd
 			for (int i = 1; i < sizex-1; i++) {
-				if (mc.Vf[ncells*mat + i+sizex*j] > 0.0) {
+				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
 					// o: outer
-					double xo = mc.x[i+sizex*j];
-					double yo = mc.y[i+sizex*j];
+					double xo = x[i+sizex*j];
+					double yo = y[i+sizex*j];
 
 					double rho_sum = 0.0;
 					int Nn = 0;
@@ -286,26 +306,26 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 							if ((i + ni < 0) || (i + ni >= sizex)) // TODO: better way?
 								continue;
 
-							if (mc.Vf[ncells*mat + (i+ni)+sizex*(j+nj)] > 0.0) {
+							if (Vf[ncells*mat + (i+ni)+sizex*(j+nj)] > 0.0) {
 								double dsqr = 0.0;
 
 								// i: inner
-								double xi = mc.x[(i+ni)+sizex*(j+nj)];
-								double yi = mc.y[(i+ni)+sizex*(j+nj)];
+								double xi = x[(i+ni)+sizex*(j+nj)];
+								double yi = y[(i+ni)+sizex*(j+nj)];
 
 								dsqr += (xo - xi) * (xo - xi);
 								dsqr += (yo - yi) * (yo - yi);
 
-								rho_sum += mc.rho[ncells*mat + i+sizex*j] / dsqr;
+								rho_sum += rho[ncells*mat + i+sizex*j] / dsqr;
 								Nn += 1;
 							}
 						}
 					}
 
-					mc.rho_mat_ave[ncells*mat + i+sizex*j] = rho_sum / Nn;
+					rho_mat_ave[ncells*mat + i+sizex*j] = rho_sum / Nn;
 				}
 				else {
-					mc.rho_mat_ave[ncells*mat + i+sizex*j] = 0.0;
+					rho_mat_ave[ncells*mat + i+sizex*j] = 0.0;
 				}
 			}
 		}

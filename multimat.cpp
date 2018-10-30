@@ -424,7 +424,7 @@ int main(int argc, char* argv[]) {
 
 			cell_counts_by_mat[count-1]++;
 
-			if (print_to_file) {
+			if (print_to_file==1) {
 				if (i!=0) fprintf(f,", %d",count);
 				else fprintf(f,"%d",count);
 			}
@@ -433,13 +433,17 @@ int main(int argc, char* argv[]) {
 				if (cc.rho[(i+sizex*j)*Nmats+mat]!=0.0) cc.Vf[(i+sizex*j)*Nmats+mat]=1.0/count;
 			}
 		}
-		if (print_to_file)
+		if (print_to_file==1)
 			fprintf(f,"\n");
 	}
 	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d: MMC cells %d\n",
 		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3], ccc.mmc_cells);
 
-	if (print_to_file)
+  if (cell_counts_by_mat[1]*2+cell_counts_by_mat[2]*3+cell_counts_by_mat[3]*4 >= list_size) {
+    printf("ERROR: list_size too small\n");
+    exit(-1);
+  }
+	if (print_to_file==1)
 		fclose(f);
 
 	// Convert representation to material-centric (using extra buffers)
@@ -521,6 +525,7 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	ccc.mmc_index[ccc.mmc_cells] = imaterial_multi_cell;
+  ccc.mm_len = imaterial_multi_cell;
 
 	full_matrix_cell_centric(cc);
 	full_matrix_material_centric(cc, mc);
