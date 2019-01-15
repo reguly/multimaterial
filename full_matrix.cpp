@@ -132,7 +132,7 @@ void full_matrix_cell_centric(full_data cc)
 					dsqr[(nj+1)*3 + (ni+1)] += (yo - yi) * (yo - yi);
 				}
 			}
-//#pragma omp simd
+#pragma omp simd
 			for (int mat = 0; mat < Nmats; mat++) {
 				if (Vf[(i+sizex*j)*Nmats+mat] > 0.0) {
 					double rho_sum = 0.0;
@@ -288,7 +288,7 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   #if defined(ACC)
   #pragma acc loop independent
   #endif
-//#pragma omp simd
+#pragma omp simd
 			for (int i = 1; i < sizex-1; i++) {
 				if (Vf[ncells*mat + i+sizex*j] > 0.0) {
 					// o: outer
@@ -316,7 +316,7 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 								dsqr += (xo - xi) * (xo - xi);
 								dsqr += (yo - yi) * (yo - yi);
 
-								rho_sum += rho[ncells*mat + i+sizex*j] / dsqr;
+								rho_sum += rho[ncells*mat + (i+ni)+sizex*(j+nj)] / dsqr;
 								Nn += 1;
 							}
 						}
