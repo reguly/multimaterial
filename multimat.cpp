@@ -265,6 +265,80 @@ void initialise_field_rand(full_data cc, double prob2, double prob3, double prob
 	}
 }
 
+void initialise_field_file(full_data cc) {
+  int sizex = cc.sizex;
+	int sizey = cc.sizey;
+	int Nmats = cc.Nmats;
+	int width = sizex/Nmats;
+
+  int status;
+  FILE *fp;
+  fp = fopen("volfrac.dat", "r");
+  if (!fp) {
+    fprintf(stderr, "unable to read volume fractions from file \"%s\"\n",
+        "volfrac.dat");
+    exit(-1);
+  }
+
+  int nmats;
+  status = fscanf(fp, "%d", &nmats);
+  if (status < 0) {
+    printf("error in read at line %d\n",__LINE__);
+    exit(1);
+  }
+  if (nmats != Nmats) {
+    printf("Error, invalid Nmats: %d!=%d\n", nmats, Nmats);
+    exit(1);
+  }
+  if (sizex%1000 != 0 || sizey%1000!=0) {
+    printf("size needs to be an integer multiple of 1000x1000: %dx%d\n", sizex, sizey);
+    exit(1);
+  }
+  int sx = sizex/1000;
+  int sy = sizey/1000;
+
+  status = fscanf(fp, "%d", &nmats);
+  if (status < 0) {
+    printf("error in read at line %d\n",__LINE__);
+    exit(1);
+  }
+
+  for (int j = 0; j < sizey; j++)
+    for (int i = 0; i < sizex; i++)
+      for (int m = 0; m < nmats; m++)
+        cc.Vf[(i+sizex*j)*Nmats+m] = 0.0;
+
+  char matname[256];
+  for (int m = 0; m < nmats; m++){
+    status = fscanf(fp, "%s", matname);            // read and discard
+    if (status < 0) {
+      printf("error in read at line %d\n",__LINE__);
+      exit(1);
+    }
+  }
+
+  for (int j = 0; j < 1000; j++)
+    for (int i = 0; i < 1000; i++)
+      for (int m = 0; m < nmats; m++) {
+        double volfrac;
+        status = fscanf(fp, "%lf", &(volfrac));
+        if (status < 0) {
+          printf("error in read at line %d\n",__LINE__);
+          exit(1);
+        }
+        if (volfrac > 0.0) {
+          for (int jj = 0; jj < sy; jj++)
+          for (int ii = 0; ii < sx; ii++) {
+          cc.Vf[(i*sx+ii+sizex*(j*sy+jj))*Nmats+m] = volfrac;
+          cc.rho[(i*sx+ii+sizex*(j*sy+jj))*Nmats+m] = 1.0;
+          cc.t[(i*sx+ii+sizex*(j*sy+jj))*Nmats+m] = 1.0;
+          cc.p[(i*sx+ii+sizex*(j*sy+jj))*Nmats+m] = 1.0;
+        }
+      }
+      }
+  fclose(fp);
+
+}
 
 int main(int argc, char* argv[]) {
 	int sizex = 1000;
@@ -275,7 +349,7 @@ int main(int argc, char* argv[]) {
     sizey = atoi(argv[2]);
 	int ncells = sizex*sizey;
 
-	int Nmats = 40;
+	int Nmats = 50;
 
 	full_data cc;
 	full_data mc;
@@ -396,7 +470,8 @@ int main(int argc, char* argv[]) {
   ccc.n = mc.n = cc.n;
   
   if (argc>=6) initialise_field_rand(cc, atof(argv[3]), atof(argv[4]), atof(argv[5]));
-  else initialise_field_static(cc);
+  else initialise_field_file(cc);
+  //else initialise_field_static(cc);
 
 	FILE *f;
 	int print_to_file = 0;
@@ -415,10 +490,10 @@ int main(int argc, char* argv[]) {
 			}
 			if (count == 0) {
 				printf("Error: no materials in cell %d %d\n",i,j);
-				if (print_to_file)
-					fclose(f);
-
-				goto end;
+        int mat = 1;
+        cc.rho[(i+sizex*j)*Nmats+mat] = 1.0;cc.t[(i+sizex*j)*Nmats+mat] = 1.0;cc.p[(i+sizex*j)*Nmats+mat] = 1.0; cc.Vf[(i+sizex*j)*Nmats+mat] = 1.0;
+        mc.rho[ncells*mat + i+sizex*j] = 1.0;mc.t[ncells*mat + i+sizex*j] = 1.0;mc.p[ncells*mat + i+sizex*j] = 1.0; mc.Vf[ncells*mat + i+sizex*j] = 1.0;
+        count = 1;
 			}
 			if (count > 1) ccc.mmc_cells++;
 
@@ -429,6 +504,7 @@ int main(int argc, char* argv[]) {
 				else fprintf(f,"%d",count);
 			}
 
+      if (argc>=6) //Only if rand - file read has Volfrac already
 			for (int mat = 0; mat < Nmats; mat++) {
 				if (cc.rho[(i+sizex*j)*Nmats+mat]!=0.0) cc.Vf[(i+sizex*j)*Nmats+mat]=1.0/count;
 			}
@@ -477,7 +553,10 @@ int main(int argc, char* argv[]) {
 
 			if (count == 0) {
 				printf("Error: no materials in cell %d %d\n",i,j);
-				goto end;
+        int mat = 1;
+        cc.rho[(i+sizex*j)*Nmats+mat] = 1.0;cc.t[(i+sizex*j)*Nmats+mat] = 1.0;cc.p[(i+sizex*j)*Nmats+mat] = 1.0; cc.Vf[(i+sizex*j)*Nmats+mat] = 1.0;
+        mc.rho[ncells*mat + i+sizex*j] = 1.0;mc.t[ncells*mat + i+sizex*j] = 1.0;mc.p[ncells*mat + i+sizex*j] = 1.0; mc.Vf[ncells*mat + i+sizex*j] = 1.0;
+        count = 1;
 			}
 
 			if (count == 1) {

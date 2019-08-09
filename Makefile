@@ -1,8 +1,12 @@
-CC=g++ #pgc++
+#CC=g++ #pgc++
+#ACCFLAGS=-DACC -O3 -fast -g -acc -ta=tesla,cc60 -Minfo=acc -mp -Mcuda #-Ofast -mavx2 -mp
+#OMPFLAGS=-DOMP -O3 -g -fopenmp #-DFUSED -DLINKED #-fopenmp #-mp -fastsse -fast #-DLINKED
+#NVCCFLAGS=-O0 -g -G -arch=sm_60 #-DFUSED -DLINKED
+
+CC=icpc #pgc++
 ACCFLAGS=-DACC -O3 -fast -g -acc -ta=tesla,cc60 -Minfo=acc -mp -Mcuda #-Ofast -mavx2 -mp
-OMPFLAGS=-DOMP -O0 -g -fopenmp #-DFUSED -DLINKED #-fopenmp #-mp -fastsse -fast #-DLINKED
-#
-NVCCFLAGS=-O0 -g -G -arch=sm_60 #-DFUSED -DLINKED
+OMPFLAGS=-DOMP -O3 -g -qopenmp -qopt-report=5 -xHost -fp-model=fast #-DFUSED -DLINKED #-fopenmp #-mp -fastsse -fast #-DLINKED
+NVCCFLAGS=-O3 -g -arch=sm_60 #-DFUSED -DLINKED
 
 .cpp.o:
 	$(CC) -c $(CFLAGS) $<
