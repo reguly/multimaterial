@@ -627,6 +627,44 @@ int main(int argc, char* argv[]) {
     t3+=a3;
   }
   printf("%g %g %g\n", t1/10.0,t2/10.0,t3/10.0);
+  int cell_mat_count = 1*cell_counts_by_mat[0] + 2*cell_counts_by_mat[1]
+                     + 3*cell_counts_by_mat[2] + 4*cell_counts_by_mat[3];
+//Alg 1:
+size_t alg1 = 0;
+//read imaterial (sizex*sizey)*sizeof(int)
+alg1 += (sizex*sizey)*sizeof(int);
+#ifdef FUSED
+//write rho_ave_compact (sizex*sizey)*sizeof(double)
+alg1 += (sizex*sizey)*sizeof(double);
+//read V (sizex*sizey)*sizeof(double)
+alg1 += (sizex*sizey)*sizeof(double);
+//read rho_compact+list cell_mat_count*sizeof(double)
+alg1 += cell_mat_count*sizeof(double);
+//read Vf (cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg1 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//LINKED - read nextfrac (cell_mat_count - cell_counts_by_mat[0])*sizeof(int)
+#ifdef LINKED
+alg1 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//CSR - read mmc_index (ccc.mmc_cells+1) * sizeof(int)
+#else
+alg1 += (ccc.mmc_cells+1) * sizeof(int);
+#endif
+#else
+//write rho_ave_compact (sizex*sizey+ccc.mmc_cells)*sizeof(double)
+alg1 += (sizex*sizey+ccc.mmc_cells)*sizeof(double);
+//read V (sizex*sizey+ccc.mmc_cells)*sizeof(double)
+alg1 += (sizex*sizey+ccc.mmc_cells)*sizeof(double);
+//read rho_compact+list (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg1 += (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//read Vf (cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg1 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//CSR - read mmc_index (ccc.mmc_cells+1) * sizeof(int)
+alg1 += (ccc.mmc_cells+1) * sizeof(int);
+//CSR - read mmc_i&j (ccc.mmc_cells) * 2 * sizeof(int)
+alg1 += (ccc.mmc_cells) * 2 * sizeof(int);
+#endif
+printf("%g\n", alg1*10.0/t1/1e9);
+
 	// Check results
 	if (!compact_check_results(cc, ccc))
 	{
