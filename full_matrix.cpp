@@ -67,7 +67,9 @@ void full_matrix_cell_centric(full_data cc)
 			rho_ave[i+sizex*j] = ave/V[i+sizex*j];
 		}
 	}
+#ifdef DEBUG
   printf("Full matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
+#endif
 
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
@@ -97,7 +99,9 @@ void full_matrix_cell_centric(full_data cc)
 			}
 		}
 	}
+#ifdef DEBUG
   printf("Full matrix, cell centric, alg 2: %g sec\n", omp_get_wtime()-t1);
+#endif
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
@@ -160,7 +164,9 @@ void full_matrix_cell_centric(full_data cc)
 			}
 		}
 	}
+#ifdef DEBUG
   printf("Full matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
+#endif
 }
 }
 
@@ -240,7 +246,9 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 			rho_ave[i+sizex*j] /= V[i+sizex*j];
 		}
 	}
+#ifdef DEBUG
   printf("Full matrix, material centric, alg 1: %g sec\n", omp_get_wtime()-t1);
+#endif
 
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
@@ -270,7 +278,9 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 			}
 		}
 	}
+#ifdef DEBUG
   printf("Full matrix, material centric, alg 2: %g sec\n", omp_get_wtime()-t1);
+#endif
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
@@ -330,7 +340,9 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 			}
 		}
 	}
+#ifdef DEBUG
   printf("Full matrix, material centric, alg 2: %g sec\n", omp_get_wtime()-t1);
+#endif
   }
 }
 
@@ -341,7 +353,9 @@ bool full_matrix_check_results(full_data cc, full_data mc)
 	int sizey = cc.sizey;
 	int Nmats = cc.Nmats;
 	int ncells = sizex * sizey;
+#ifdef DEBUG
 	printf("Checking results of full matrix representation... ");
+#endif
 
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
@@ -367,6 +381,8 @@ bool full_matrix_check_results(full_data cc, full_data mc)
 		}
 	}
 
+#ifdef DEBUG
 	printf("All tests passed!\n");
+#endif
 	return true;
 }

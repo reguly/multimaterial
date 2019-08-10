@@ -49,7 +49,7 @@ struct compact_data
 	int mmc_cells;
 };
 
-void compact_cell_centric(full_data cc, compact_data ccc)
+void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3)
 {
 	int sizex = cc.sizex;
 	int sizey = cc.sizey;
@@ -141,7 +141,11 @@ void compact_cell_centric(full_data cc, compact_data ccc)
     rho_ave_compact[mmc_i[c]+sizex*mmc_j[c]] = ave/V[mmc_i[c]+sizex*mmc_j[c]];
   }
 #endif
-  printf("Compact matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
+  
+  a1 = omp_get_wtime()-t1;
+#ifdef DEBUG
+  printf("Compact matrix, cell centric, alg 1: %g sec\n", a1);
+#endif
 
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
@@ -203,7 +207,10 @@ void compact_cell_centric(full_data cc, compact_data ccc)
   }
 #endif
 
-  printf("Compact matrix, cell centric, alg 2: %g sec\n", omp_get_wtime()-t1);
+  a2 = omp_get_wtime()-t1;
+#ifdef DEBUG
+  printf("Compact matrix, cell centric, alg 2: %g sec\n", a2);
+#endif
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
@@ -356,7 +363,10 @@ void compact_cell_centric(full_data cc, compact_data ccc)
 			} // end else
 		}
 	}
-  printf("Compact matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
+  a3 = omp_get_wtime()-t1;
+#ifdef DEBUG
+  printf("Compact matrix, cell centric, alg 3: %g sec\n", a3);
+#endif
   }
 }
 
@@ -368,7 +378,9 @@ bool compact_check_results(full_data cc, compact_data ccc)
 	int Nmats = cc.Nmats;
 	int mmc_cells = ccc.mmc_cells;
 
+#ifdef DEBUG
 	printf("Checking results of compact representation... ");
+#endif
 
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
@@ -416,6 +428,8 @@ bool compact_check_results(full_data cc, compact_data ccc)
 		}
 	}
 
+#ifdef DEBUG
 	printf("All tests passed!\n");
+#endif
 	return true;
 }

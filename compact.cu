@@ -2,8 +2,17 @@
 #include <stdio.h>
 #include <omp.h>
 
-char *cp_to_device(char *from, size_t size);
-void cp_to_host(char *to, char*from, size_t size);
+char *cp_to_device(char *from, size_t size) {
+	char *tmp;
+	cudaMalloc((void**)&tmp, size);
+	cudaMemcpy(tmp, from, size, cudaMemcpyHostToDevice);
+	return tmp;
+}
+
+void cp_to_host(char *to, char*from, size_t size) {
+	cudaMemcpy(to, from, size, cudaMemcpyDeviceToHost);
+  cudaFree(from);
+}
 __global__ void ccc_loop1(const int * __restrict imaterial, const int * __restrict nextfrac, const double * __restrict rho_compact, const double * __restrict rho_compact_list, 
 						  const double * __restrict  Vf_compact_list, const double * __restrict  V, double * __restrict rho_ave_compact, int sizex, int sizey, int * __restrict mmc_index) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -290,7 +299,7 @@ struct compact_data
 };
 
 
-void compact_cell_centric(full_data cc, compact_data ccc)
+void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3)
 {
 
   int sizex = cc.sizex;
@@ -334,7 +343,10 @@ void compact_cell_centric(full_data cc, compact_data ccc)
   ccc_loop1_2<<<(mmc_cells-1)/(thx*thy)+1, (thx*thy)>>>(d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, d_mmc_index, mmc_cells, d_mmc_i, d_mmc_j, sizex, sizey);
 #endif
   cudaDeviceSynchronize();
-  printf("Compact matrix, cell centric, alg 1: %g sec\n", omp_get_wtime()-t1);
+  a1 = omp_get_wtime()-t1;
+#ifdef DEBUG
+  printf("Compact matrix, cell centric, alg 1: %g sec\n", a1);
+#endif
 	// Computational loop 2 - Pressure for each cell and each material
   t1 = omp_get_wtime();
   ccc_loop2<<<blocks, threads>>>(d_imaterial, d_matids,d_nextfrac, d_rho_compact, d_rho_compact_list, d_t_compact, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact, d_p_compact_list, sizex, sizey, d_mmc_index);
@@ -342,13 +354,19 @@ void compact_cell_centric(full_data cc, compact_data ccc)
   ccc_loop2_2<<<(mm_len-1)/(thx*thy)+1, (thx*thy)>>>(d_matids, d_rho_compact_list, d_t_compact_list, d_Vf_compact_list, d_n, d_p_compact_list, d_mmc_index, mm_len);
 #endif
   cudaDeviceSynchronize();
-  printf("Compact matrix, cell centric, alg 2: %g sec\n", omp_get_wtime()-t1);
+  a2 = omp_get_wtime()-t1;
+#ifdef DEBUG
+  printf("Compact matrix, cell centric, alg 2: %g sec\n", a2);
+#endif
 
 	// Computational loop 3 - Average density of each material over neighborhood of each cell
   t1 = omp_get_wtime();
 	ccc_loop3<<<blocks, threads>>>(d_imaterial,d_nextfrac, d_matids, d_rho_compact, d_rho_compact_list, d_rho_mat_ave_compact, d_rho_mat_ave_compact_list, d_x, d_y, sizex, sizey, d_mmc_index);  
   cudaDeviceSynchronize();
- 	printf("Compact matrix, cell centric, alg 3: %g sec\n", omp_get_wtime()-t1);
+  a3 = omp_get_wtime()-t1;
+#ifdef DEBUG
+ 	printf("Compact matrix, cell centric, alg 3: %g sec\n", a3);
+#endif
   
 	cp_to_host((char*)ccc.x, (char*)d_x, sizex*sizey*sizeof(double));
 	cp_to_host((char*)ccc.y, (char*)d_y, sizex*sizey*sizeof(double));
@@ -375,7 +393,9 @@ bool compact_check_results(full_data cc, compact_data ccc)
   int mm_len = ccc.mm_len;
 
 
+#ifdef DEBUG
 	printf("Checking results of compact representation... ");
+#endif
 
 	for (int j = 0; j < sizey; j++) {
 		for (int i = 0; i < sizex; i++) {
@@ -422,6 +442,8 @@ bool compact_check_results(full_data cc, compact_data ccc)
       }
     }
   }
+#ifdef DEBUG
 	printf("All tests passed!\n");
+#endif
 	return true;
 }

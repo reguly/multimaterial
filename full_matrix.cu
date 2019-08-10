@@ -22,17 +22,6 @@ struct full_data
 };
 
 
-char *cp_to_device(char *from, size_t size) {
-	char *tmp;
-	cudaMalloc((void**)&tmp, size);
-	cudaMemcpy(tmp, from, size, cudaMemcpyHostToDevice);
-	return tmp;
-}
-
-void cp_to_host(char *to, char*from, size_t size) {
-	cudaMemcpy(to, from, size, cudaMemcpyDeviceToHost);
-  cudaFree(from);
-}
 
 __global__ void cc_loop1(const double * __restrict rho, const double * __restrict  Vf, const double * __restrict  V, double * __restrict rho_ave, int sizex, int sizey, int Nmats) {
 	int i = threadIdx.x + blockIdx.x * blockDim.x;

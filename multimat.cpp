@@ -90,7 +90,7 @@ extern void full_matrix_material_centric(full_data cc, full_data mc);
 
 extern bool full_matrix_check_results(full_data cc, full_data mc);
 
-extern void compact_cell_centric(full_data cc, compact_data ccc);
+extern void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3);
 
 extern bool compact_check_results(full_data cc, compact_data ccc);
 
@@ -102,7 +102,9 @@ void initialise_field_rand(full_data cc, double prob2, double prob3, double prob
   //let's use a morton space filling curve here
   srand(0);
   double prob1 = 1.0-prob2-prob3-prob4;
+#ifdef DEBUG
   printf("Random layout %g %g %g %g\n", prob1, prob2, prob3, prob4);
+#endif
 
   for (int n = 0; n < cc.sizex*sizey; n++) {
     int i = n%cc.sizex;//n & 0xAAAA;
@@ -512,8 +514,10 @@ int main(int argc, char* argv[]) {
 		if (print_to_file==1)
 			fprintf(f,"\n");
 	}
+#ifdef DEBUG
 	printf("Pure cells %d, 2-materials %d, 3 materials %d, 4 materials %d: MMC cells %d\n",
 		cell_counts_by_mat[0],cell_counts_by_mat[1],cell_counts_by_mat[2],cell_counts_by_mat[3], ccc.mmc_cells);
+#endif
 
   if (cell_counts_by_mat[1]*2+cell_counts_by_mat[2]*3+cell_counts_by_mat[3]*4 >= list_size) {
     printf("ERROR: list_size too small\n");
@@ -607,14 +611,22 @@ int main(int argc, char* argv[]) {
   ccc.mm_len = imaterial_multi_cell;
 
 	full_matrix_cell_centric(cc);
-	full_matrix_material_centric(cc, mc);
+/*	full_matrix_material_centric(cc, mc);
 	// Check results
 	if (!full_matrix_check_results(cc, mc)) {
 		goto end;
-	}
+	}*/
 
-
-	compact_cell_centric(cc, ccc);
+  double a1,a2,a3;
+	compact_cell_centric(cc, ccc, a1,a2,a3);
+  double t1=0, t2=0, t3=0;
+  for (int i = 0; i < 10; i++) {
+    compact_cell_centric(cc, ccc, a1,a2,a3);
+    t1+=a1;
+    t2+=a2;
+    t3+=a3;
+  }
+  printf("%g %g %g\n", t1/10.0,t2/10.0,t3/10.0);
 	// Check results
 	if (!compact_check_results(cc, ccc))
 	{
