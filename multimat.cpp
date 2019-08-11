@@ -633,6 +633,8 @@ int main(int argc, char* argv[]) {
 size_t alg1 = 0;
 //read imaterial (sizex*sizey)*sizeof(int)
 alg1 += (sizex*sizey)*sizeof(int);
+//read Vf (cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg1 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
 #ifdef FUSED
 //write rho_ave_compact (sizex*sizey)*sizeof(double)
 alg1 += (sizex*sizey)*sizeof(double);
@@ -640,8 +642,6 @@ alg1 += (sizex*sizey)*sizeof(double);
 alg1 += (sizex*sizey)*sizeof(double);
 //read rho_compact+list cell_mat_count*sizeof(double)
 alg1 += cell_mat_count*sizeof(double);
-//read Vf (cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
-alg1 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
 //LINKED - read nextfrac (cell_mat_count - cell_counts_by_mat[0])*sizeof(int)
 #ifdef LINKED
 alg1 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
@@ -656,14 +656,73 @@ alg1 += (sizex*sizey+ccc.mmc_cells)*sizeof(double);
 alg1 += (sizex*sizey+ccc.mmc_cells)*sizeof(double);
 //read rho_compact+list (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
 alg1 += (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
-//read Vf (cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
-alg1 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
 //CSR - read mmc_index (ccc.mmc_cells+1) * sizeof(int)
 alg1 += (ccc.mmc_cells+1) * sizeof(int);
 //CSR - read mmc_i&j (ccc.mmc_cells) * 2 * sizeof(int)
 alg1 += (ccc.mmc_cells) * 2 * sizeof(int);
 #endif
-printf("%g\n", alg1*10.0/t1/1e9);
+
+//Alg2
+size_t alg2 = 0;
+//read imaterial (sizex*sizey)*sizeof(int)
+alg2 += (sizex*sizey)*sizeof(int);
+//read Vf (cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg2 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//read matids (cell_mat_count - cell_counts_by_mat[0])*sizeof(int)
+alg2 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(int);
+#ifdef FUSED
+//read rho_compact+list cell_mat_count*sizeof(double)
+alg2 += cell_mat_count*sizeof(double);
+//read t_compact+list cell_mat_count*sizeof(double)
+alg2 += cell_mat_count*sizeof(double);
+//read p_compact+list cell_mat_count*sizeof(double)
+alg2 += cell_mat_count*sizeof(double);
+//read n Nmats*sizeof(double)
+alg2 += Nmats*sizeof(double);
+//LINKED - read nextfrac (cell_mat_count - cell_counts_by_mat[0])*sizeof(int)
+#ifdef LINKED
+alg2 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//CSR - read mmc_index (ccc.mmc_cells+1) * sizeof(int)
+#else
+alg2 += (ccc.mmc_cells+1) * sizeof(int);
+#endif
+
+#else //FUSED
+//read rho_compact+list (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg2 += (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//read t_compact+list (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg2 += (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//read p_compact+list (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double)
+alg2 += (sizex*sizey+cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//CSR - read mmc_index (ccc.mmc_cells+1) * sizeof(int)
+alg2 += (ccc.mmc_cells+1) * sizeof(int);
+//read n Nmats*sizeof(double)
+alg2 += Nmats*sizeof(double);
+#endif
+
+
+//Alg3
+size_t alg3 = 0;
+//read x & y
+alg3 += 2*sizex*sizey*sizeof(double);
+//read imaterial (sizex*sizey)*sizeof(int)
+alg3 += (sizex*sizey)*sizeof(int);
+//write rho_mat_ave_compact+list cell_mat_count*sizeof(double)
+alg3 += cell_mat_count*sizeof(double);
+//read matids (cell_mat_count - cell_counts_by_mat[0])*sizeof(int)
+alg3 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(int);
+//read rho_compact+list cell_mat_count*sizeof(double)
+alg3 += cell_mat_count*sizeof(double);
+//LINKED - read nextfrac (cell_mat_count - cell_counts_by_mat[0])*sizeof(int)
+#ifdef LINKED
+alg3 += (cell_mat_count - cell_counts_by_mat[0])*sizeof(double);
+//CSR - read mmc_index (ccc.mmc_cells+1) * sizeof(int)
+#else
+alg3 += (ccc.mmc_cells+1) * sizeof(int);
+#endif
+
+
+printf("%g %g %g\n", alg1*10.0/t1/1e9, alg1*10.0/t1/1e9, alg3*10.0/t1/1e9);
 
 	// Check results
 	if (!compact_check_results(cc, ccc))
