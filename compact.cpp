@@ -80,6 +80,10 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   #if defined(ACC)
   #pragma acc data copy(imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells], rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
   #endif
+ #if defined(OMP4)
+  #pragma omp target data map(tofrom: imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells], rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
+  #endif
+
   { 
 	// Cell-centric algorithms
 	// Computational loop 1 - average density in cell
@@ -89,6 +93,8 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   #elif defined(ACC)
   #pragma acc parallel
   #pragma acc loop independent
+  #elif defined(OMP4)
+  #pragma omp target teams distribute parallel for collapse(2)
   #endif
 	for (int j = 0; j < sizey; j++) {
   #if defined(OMP)
@@ -132,6 +138,8 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   #elif defined(ACC)
   #pragma acc parallel
   #pragma acc loop independent
+  #elif defined(OMP4)
+  #pragma omp target teams distribute parallel for
   #endif
   for (int c = 0; c < mmc_cells; c++) {
     double ave = 0.0;
@@ -155,6 +163,8 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   #elif defined(ACC)
   #pragma acc parallel
   #pragma acc loop independent
+  #elif defined(OMP4)
+  #pragma omp target teams distribute parallel for collapse(2)
   #endif
 	for (int j = 0; j < sizey; j++) {
   #if defined(OMP)
@@ -200,6 +210,8 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   #elif defined(ACC)
   #pragma acc parallel
   #pragma acc loop independent
+  #elif defined(OMP4)
+  #pragma omp target teams distribute parallel for
   #endif
   for (int idx = 0; idx < mmc_index[mmc_cells]; idx++) {
     double nm = n[matids[idx]];
@@ -219,6 +231,8 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   #elif defined(ACC)
   #pragma acc parallel
   #pragma acc loop independent
+  #elif defined(OMP4)
+  #pragma omp target teams distribute parallel for collapse(2)
   #endif
 	for (int j = 1; j < sizey-1; j++) {
   #if defined(OMP)
