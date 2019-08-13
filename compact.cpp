@@ -76,12 +76,13 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   int * __restrict__ mmc_index = ccc.mmc_index;
   int * __restrict__ mmc_i = ccc.mmc_i;
   int * __restrict__ mmc_j = ccc.mmc_j;
-
+  if (Nmats < 1)
+    printf("%d\n", Nmats);
   #if defined(ACC)
-  #pragma acc data copy(imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells], rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
+  #pragma acc data copy(imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[0:Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells], rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
   #endif
  #if defined(OMP4)
-  #pragma omp target data map(tofrom: imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells], rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
+  #pragma omp target data map(tofrom: imaterial[0:sizex*sizey],matids[0:mm_len], nextfrac[0:mm_len], x[0:sizex*sizey], y[0:sizex*sizey],n[0:Nmats], rho_compact[0:sizex*sizey], rho_compact_list[0:mm_len], rho_ave_compact[0:sizex*sizey], p_compact[0:sizex*sizey], p_compact_list[0:mm_len], t_compact[0:sizex*sizey], t_compact_list[0:mm_len], V[0:sizex*sizey], Vf_compact_list[0:mm_len], mmc_index[0:mmc_cells+1], mmc_i[0:mmc_cells], mmc_j[0:mmc_cells], rho_mat_ave_compact[0:sizex*sizey], rho_mat_ave_compact_list[0:mm_len])
   #endif
 
   { 

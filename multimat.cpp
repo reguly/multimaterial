@@ -111,31 +111,31 @@ void initialise_field_rand(full_data cc, double prob2, double prob3, double prob
     int j = n/cc.sizex;//n & 0x5555;
 
     double r = (double)rand()/(double)RAND_MAX;
-    int m = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+    int m = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
     int m2, m3, m4;
     cc.rho[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
     cc.t[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
     cc.p[(i+cc.sizex*j)*cc.Nmats+m] = 1.0;
     if (r >= prob1) {
-      m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+      m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
       while (m2 == m)
-        m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+        m2 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
       cc.rho[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
       cc.t[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
       cc.p[(i+cc.sizex*j)*cc.Nmats+m2] = 1.0;
     }
     if (r >= 1.0-prob4-prob3) {
-      m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+      m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
       while (m3 == m && m3 == m2)
-        m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+        m3 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
       cc.rho[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
       cc.t[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
       cc.p[(i+cc.sizex*j)*cc.Nmats+m3] = 1.0;
     }
     if (r >= 1.0-prob4) {
-      m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+      m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
       while (m4 == m && m4 == m2 && m4 == m3)
-        m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(i/(cc.sizex*sizey/4));
+        m4 = (double)rand()/(double)RAND_MAX * cc.Nmats/4 + (cc.Nmats/4)*(n/(cc.sizex*sizey/4));
       cc.rho[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
       cc.t[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;
       cc.p[(i+cc.sizex*j)*cc.Nmats+m4] = 1.0;

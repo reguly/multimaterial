@@ -11,7 +11,7 @@
 ifeq ($(CC),g++)
 	OMPFLAGS=-DOMP -Ofast -ffp-contract=fast -fopenmp
 	AFF=OMP_PROC_BIND=TRUE
-	NVCCFLAGS=-O3 -use_fast_math -arch=sm_60 -Xcompiler=-fopenmp
+	NVCCFLAGS=-O3 -use_fast_math -arch=sm_70 -Xcompiler=-fopenmp
 endif
 ifeq ($(CC),icpc)
 	OMPFLAGS=-DOMP -O3 -g -qopenmp -qopt-report=5 -xHost -fp-model=fast
@@ -33,7 +33,8 @@ ifeq ($(CC),xlc++)
         OMPFLAGS=-DOMP -O5 -qarch=pwr9 -qtune=pwr9 -qhot -qxflag=nrcptpo -qinline=level=10 -qsmp=omp -qthreaded
 	AFF=OMP_PROC_BIND=TRUE #XLSMPOPTS="stride=1"
         NVCCFLAGS=-O3 -use_fast_math -arch=sm_60
-        ACCFLAGS=-DOMP4 -Ofast -fopenmp -fopenmp-targets=nvptx64 -ffp-contract=fast -Xcuda-ptxas -v #-Ofast -mavx2 -mp
+	ACCFLAGS=-DOMP4 -g -qsmp=omp -qoffload -qtgtarch=sm_70 -Ofast -Wx,-nvvm-compile-options=-ftz=1 -Wx,-nvvm-compile-options=-prec-div=0 -Wx,-nvvm-compile-options=-prec-sqrt=0
+        #ACCFLAGS=-DOMP4 -Ofast -fopenmp -fopenmp-targets=nvptx64 -ffp-contract=fast -Xcuda-ptxas -v #-Ofast -mavx2 -mp
 endif
 ifeq ($(CC),CC)
         OMPFLAGS=-DOMP -O3 -h fp3 -h ipa5 -h omp
@@ -130,7 +131,7 @@ test_gpu: multimat_cuda multimat_cuda_F multimat_cuda_FL
 test_acc: multimat_acc multimat_acc_F multimat_acc_FL
 	$(AFF) ./multimat_acc_FL 3000 3000
 	$(AFF) ./multimat_acc_F 3000 3000
-	$(AFF) ./multimat_acc 3000 3000
+#	$(AFF) ./multimat_acc 3000 3000
 	$(AFF) ./multimat_acc_FL 3000 3000 0.3 0.05 0.05
 	$(AFF) ./multimat_acc_F 3000 3000 0.3 0.05 0.05
-	$(AFF) ./multimat_acc 3000 3000 0.3 0.05 0.05
+#	$(AFF) ./multimat_acc 3000 3000 0.3 0.05 0.05

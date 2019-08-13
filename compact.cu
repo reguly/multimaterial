@@ -337,6 +337,7 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
 
 	// Cell-centric algorithms
 	// Computational loop 1 - average density in cell
+  cudaDeviceSynchronize();
   double t1 = omp_get_wtime();
   ccc_loop1<<<blocks, threads>>>(d_imaterial, d_nextfrac, d_rho_compact, d_rho_compact_list, d_Vf_compact_list, d_V, d_rho_ave_compact, sizex, sizey, d_mmc_index);
 #ifndef FUSED
