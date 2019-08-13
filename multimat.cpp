@@ -722,7 +722,7 @@ alg3 += (ccc.mmc_cells+1) * sizeof(int);
 #endif
 
 
-printf("%g %g %g\n", alg1*10.0/t1/1e9, alg1*10.0/t1/1e9, alg3*10.0/t1/1e9);
+printf("%g %g %g\n", alg1*10.0/t1/1e9, alg1*10.0/t2/1e9, alg3*10.0/t3/1e9);
 
 	// Check results
 	if (!compact_check_results(cc, ccc))

@@ -37,7 +37,7 @@ void full_matrix_cell_centric(full_data cc)
   double * __restrict__ n = cc.n;
   double * __restrict__ rho_mat_ave = cc.rho_mat_ave;
 
-#if defined(ACC)
+#if defined(NACC)
 #pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
   copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey]) \
   copy(rho_mat_ave[0:sizex*sizey*Nmats])
@@ -48,12 +48,12 @@ void full_matrix_cell_centric(full_data cc)
   double t1 = omp_get_wtime();
   #if defined(OMP)
   #pragma omp parallel for collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 	for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 		for (int i = 0; i < sizex; i++){
@@ -75,16 +75,16 @@ void full_matrix_cell_centric(full_data cc)
   t1 = omp_get_wtime();
   #if defined(OMP)
   #pragma omp parallel for collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 	for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 		for (int i = 0; i < sizex; i++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 //#pragma omp simd
@@ -107,12 +107,12 @@ void full_matrix_cell_centric(full_data cc)
   t1 = omp_get_wtime();
   #if defined(OMP)
   #pragma omp parallel for collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 	for (int j = 1; j < sizey-1; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 		for (int i = 1; i < sizex-1; i++) {
@@ -186,7 +186,7 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   double * __restrict__ y = mc.y;
   double * __restrict__ n = mc.n;
   double * __restrict__ rho_mat_ave = mc.rho_mat_ave;
-#if defined(ACC)
+#if defined(NACC)
 #pragma acc data copy(rho[0:sizex*sizey*Nmats], p[0:sizex*sizey*Nmats], t[0:sizex*sizey*Nmats], Vf[0:sizex*sizey*Nmats]) \
   copy(V[0:sizex*sizey],x[0:sizex*sizey],y[0:sizex*sizey],n[0:Nmats],rho_ave[0:sizex*sizey]) \
   copy(rho_mat_ave[0:sizex*sizey*Nmats])
@@ -197,12 +197,12 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   double t1 = omp_get_wtime();
   #if defined(OMP)
   #pragma omp parallel for //collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 	for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 //#pragma omp simd
@@ -214,12 +214,12 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 	for (int mat = 0; mat < Nmats; mat++) {
     #if defined(OMP)
   #pragma omp parallel for //collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 		for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 //#pragma omp simd
@@ -233,12 +233,12 @@ void full_matrix_material_centric(full_data cc, full_data mc)
 
   #if defined(OMP)
   #pragma omp parallel for //collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 	for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 //#pragma omp simd
@@ -254,16 +254,16 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   t1 = omp_get_wtime();
   #if defined(OMP)
   #pragma omp parallel for collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 	for (int mat = 0; mat < Nmats; mat++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 		for (int j = 0; j < sizey; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 //#pragma omp simd
@@ -286,16 +286,16 @@ void full_matrix_material_centric(full_data cc, full_data mc)
   t1 = omp_get_wtime();
   #if defined(OMP)
   #pragma omp parallel for collapse(2)
-  #elif defined(ACC)
+  #elif defined(NACC)
   #pragma acc parallel
   #pragma acc loop independent
   #endif
 	for (int mat = 0; mat < Nmats; mat++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 		for (int j = 1; j < sizey-1; j++) {
-  #if defined(ACC)
+  #if defined(NACC)
   #pragma acc loop independent
   #endif
 #pragma omp simd

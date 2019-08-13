@@ -230,15 +230,15 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
   #pragma omp parallel for //collapse(2)
   #elif defined(ACC)
   #pragma acc parallel
-  #pragma acc loop independent
+  #pragma acc loop independent collapse(2)
   #elif defined(OMP4)
   #pragma omp target teams distribute parallel for collapse(2)
   #endif
 	for (int j = 1; j < sizey-1; j++) {
   #if defined(OMP)
   #pragma omp simd
-  #elif defined(ACC)
-  #pragma acc loop independent
+//  #elif defined(ACC)
+//  #pragma acc loop independent
   #endif
 		for (int i = 1; i < sizex-1; i++) {
 			// o: outer
@@ -249,7 +249,13 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
 			double dsqr[9];
 
 			// for all neighbours
+  #if defined(ACC)
+  #pragma acc loop seq 
+  #endif
 			for (int nj = -1; nj <= 1; nj++) {
+  #if defined(ACC)
+  #pragma acc loop seq 
+  #endif
 				for (int ni = -1; ni <= 1; ni++) {
 
 					dsqr[(nj+1)*3 + (ni+1)] = 0.0;
