@@ -308,7 +308,7 @@ void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2
 	int mmc_cells = ccc.mmc_cells;
   int mm_len = ccc.mm_len;
 
-	int    *d_imaterial = (int *)cp_to_device((char*)ccc.imaterial, sizex*sizey*Nmats*sizeof(int));
+	int    *d_imaterial = (int *)cp_to_device((char*)ccc.imaterial, sizex*sizey*sizeof(int));
 	int    *d_matids = (int *)cp_to_device((char*)ccc.matids, mm_len*sizeof(int));
 	int    *d_nextfrac = (int *)cp_to_device((char*)ccc.nextfrac, mm_len*sizeof(int));
 	int    *d_mmc_index = (int *)cp_to_device((char*)ccc.mmc_index, (mmc_cells+1)*sizeof(int));
