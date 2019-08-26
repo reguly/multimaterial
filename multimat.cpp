@@ -36,6 +36,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#ifdef KNL
+#include <hbwmalloc.h>
+#else
+#define hbw_malloc malloc
+#define hbw_free free
+#endif
 
 struct full_data
 {
@@ -409,17 +415,17 @@ int main(int argc, char* argv[]) {
 	//Allocate output datasets
 	cc.rho_ave = (double*)malloc(ncells*sizeof(double));
 	mc.rho_ave = (double*)malloc(ncells*sizeof(double));
-	ccc.rho_ave_compact = (double*)malloc(ncells*sizeof(double));
+	ccc.rho_ave_compact = (double*)hbw_malloc(ncells*sizeof(double));
 
 	// Cell-centric compact storage
-	ccc.rho_compact = (double*)malloc(ncells*sizeof(double));
-	ccc.rho_mat_ave_compact = (double*)malloc(ncells*sizeof(double));
+	ccc.rho_compact = (double*)hbw_malloc(ncells*sizeof(double));
+	ccc.rho_mat_ave_compact = (double*)hbw_malloc(ncells*sizeof(double));
 	memset(ccc.rho_mat_ave_compact, 0, ncells*sizeof(double));
-	ccc.p_compact = (double*)malloc(ncells*sizeof(double));
-	ccc.t_compact = (double*)malloc(ncells*sizeof(double));
+	ccc.p_compact = (double*)hbw_malloc(ncells*sizeof(double));
+	ccc.t_compact = (double*)hbw_malloc(ncells*sizeof(double));
 
-	int *nmats = (int*)malloc(ncells*sizeof(int));
-	ccc.imaterial = (int*)malloc(ncells*sizeof(int));
+	int *nmats = (int*)hbw_malloc(ncells*sizeof(int));
+	ccc.imaterial = (int*)hbw_malloc(ncells*sizeof(int));
 
 	// List
     double mul = ceil((double)sizex/1000.0) * ceil((double)sizey/1000.0);
@@ -429,24 +435,24 @@ int main(int argc, char* argv[]) {
 
 
 	//plain linked list
-	ccc.nextfrac = (int*)malloc(list_size*sizeof(int));
-	int *frac2cell = (int*)malloc(list_size*sizeof(int));
-	ccc.matids = (int*)malloc(list_size*sizeof(int));
+	ccc.nextfrac = (int*)hbw_malloc(list_size*sizeof(int));
+	int *frac2cell = (int*)hbw_malloc(list_size*sizeof(int));
+	ccc.matids = (int*)hbw_malloc(list_size*sizeof(int));
 
 	//CSR list
-	ccc.mmc_index = (int *)malloc(list_size*sizeof(int)); //CSR mapping for mix cell idx -> compact list position
-	ccc.mmc_i = (int *)malloc(list_size*sizeof(int)); // mixed cell -> physical cell i coord
-	ccc.mmc_j = (int *)malloc(list_size*sizeof(int)); //  mixed cell -> physical cell j coord
+	ccc.mmc_index = (int *)hbw_malloc(list_size*sizeof(int)); //CSR mapping for mix cell idx -> compact list position
+	ccc.mmc_i = (int *)hbw_malloc(list_size*sizeof(int)); // mixed cell -> physical cell i coord
+	ccc.mmc_j = (int *)hbw_malloc(list_size*sizeof(int)); //  mixed cell -> physical cell j coord
 	
 
 
 	ccc.mmc_cells = 0;
-	ccc.Vf_compact_list = (double*)malloc(list_size*sizeof(double));
-	ccc.rho_compact_list = (double*)malloc(list_size*sizeof(double));
-	ccc.rho_mat_ave_compact_list = (double*)malloc(list_size*sizeof(double));
+	ccc.Vf_compact_list = (double*)hbw_malloc(list_size*sizeof(double));
+	ccc.rho_compact_list = (double*)hbw_malloc(list_size*sizeof(double));
+	ccc.rho_mat_ave_compact_list = (double*)hbw_malloc(list_size*sizeof(double));
 	memset(ccc.rho_mat_ave_compact_list, 0, list_size*sizeof(double));
-	ccc.t_compact_list = (double*)malloc(list_size*sizeof(double));
-	ccc.p_compact_list = (double*)malloc(list_size*sizeof(double));
+	ccc.t_compact_list = (double*)hbw_malloc(list_size*sizeof(double));
+	ccc.p_compact_list = (double*)hbw_malloc(list_size*sizeof(double));
 
 	int imaterial_multi_cell;
 
@@ -616,15 +622,19 @@ int main(int argc, char* argv[]) {
 	if (!full_matrix_check_results(cc, mc)) {
 		goto end;
 	}*/
-
+#define MIN(a,b) (a)<(b)?(a):(b)
   double a1,a2,a3;
 	compact_cell_centric(cc, ccc, a1,a2,a3);
-  double t1=0, t2=0, t3=0;
+  double t1=100, t2=100, t3=100;
   for (int i = 0; i < 10; i++) {
+    a1=a2=a3=0.0;
     compact_cell_centric(cc, ccc, a1,a2,a3);
-    t1+=a1;
+/*    t1+=a1;
     t2+=a2;
-    t3+=a3;
+    t3+=a3;*/
+    t1 = MIN(t1,a1*10.0);
+    t2 = MIN(t2,a2*10.0);
+    t3 = MIN(t3,a3*10.0);
   }
   printf("%g %g %g\n", t1/10.0,t2/10.0,t3/10.0);
   int cell_mat_count = 1*cell_counts_by_mat[0] + 2*cell_counts_by_mat[1]
@@ -732,16 +742,16 @@ printf("%g %g %g\n", alg1*10.0/t1/1e9, alg1*10.0/t2/1e9, alg3*10.0/t3/1e9);
 
 end:
 	free(mc.rho); free(mc.p); free(mc.Vf); free(mc.t);
-  free(cc.rho_mat_ave); free(mc.rho_mat_ave); free(ccc.rho_mat_ave_compact); free(ccc.rho_mat_ave_compact_list);
+  free(cc.rho_mat_ave); free(mc.rho_mat_ave); hbw_free(ccc.rho_mat_ave_compact); hbw_free(ccc.rho_mat_ave_compact_list);
 	free(cc.rho); free(cc.p); free(cc.Vf); free(cc.t);
 	free(cc.V); free(cc.x); free(cc.y);
 	free(cc.n);
-	free(cc.rho_ave); free(mc.rho_ave); free(ccc.rho_ave_compact);
+	free(cc.rho_ave); free(mc.rho_ave); hbw_free(ccc.rho_ave_compact);
 
-	free(ccc.rho_compact); free(ccc.p_compact); free(ccc.t_compact);
-	free(nmats); free(ccc.imaterial);
-	free(ccc.nextfrac); free(frac2cell); free(ccc.matids);
-	free(ccc.Vf_compact_list); free(ccc.rho_compact_list);
-	free(ccc.t_compact_list); free(ccc.p_compact_list);
+	hbw_free(ccc.rho_compact); hbw_free(ccc.p_compact); hbw_free(ccc.t_compact);
+	hbw_free(nmats); hbw_free(ccc.imaterial);
+	hbw_free(ccc.nextfrac); hbw_free(frac2cell); hbw_free(ccc.matids);
+	hbw_free(ccc.Vf_compact_list); hbw_free(ccc.rho_compact_list);
+	hbw_free(ccc.t_compact_list); hbw_free(ccc.p_compact_list);
 	return 0;
 }

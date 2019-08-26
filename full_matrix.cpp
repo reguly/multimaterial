@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
-#include <omp.h>
+//#include <omp.h>
+extern "C" double omp_get_wtime();
 
 
 
