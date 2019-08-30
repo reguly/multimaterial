@@ -96,7 +96,7 @@ extern void full_matrix_material_centric(full_data cc, full_data mc);
 
 extern bool full_matrix_check_results(full_data cc, full_data mc);
 
-extern void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3);
+extern void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3, int argc, char** argv);
 
 extern bool compact_check_results(full_data cc, compact_data ccc);
 
@@ -348,7 +348,7 @@ void initialise_field_file(full_data cc) {
 
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char** argv) {
 	int sizex = 1000;
   if (argc > 1)
     sizex = atoi(argv[1]);
@@ -624,11 +624,11 @@ int main(int argc, char* argv[]) {
 	}*/
 #define MIN(a,b) (a)<(b)?(a):(b)
   double a1,a2,a3;
-	compact_cell_centric(cc, ccc, a1,a2,a3);
+	compact_cell_centric(cc, ccc, a1,a2,a3, argc, argv);
   double t1=100, t2=100, t3=100;
   for (int i = 0; i < 10; i++) {
     a1=a2=a3=0.0;
-    compact_cell_centric(cc, ccc, a1,a2,a3);
+    compact_cell_centric(cc, ccc, a1,a2,a3, argc, argv);
 /*    t1+=a1;
     t2+=a2;
     t3+=a3;*/

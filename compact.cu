@@ -299,7 +299,7 @@ struct compact_data
 };
 
 
-void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3)
+void compact_cell_centric(full_data cc, compact_data ccc, double &a1, double &a2, double &a3, int argc, char** argv)
 {
 
   int sizex = cc.sizex;
